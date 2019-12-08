@@ -1,10 +1,11 @@
-import cv2
 import librosa
 import numpy as np
 import pandas as pd
 import scipy.signal
 import torch
+from skimage import transform
 from torch.utils.data import Dataset
+from torchvision import transforms
 from tqdm import tqdm
 
 from utils import split
@@ -84,6 +85,8 @@ class AcousticSceneDataset(Dataset):
         sample = torch.from_numpy(sample)
         target = torch.from_numpy(target)
 
+        # todo implement mixup
+
         return sample, target
 
     def __len__(self):
@@ -98,7 +101,7 @@ class Spectrogram(object):
     compute spectrogram of given 1d sequence
     """
 
-    def __init___(self, nperseg=1024, noverlap=768):
+    def __init__(self, nperseg=1024, noverlap=768):
         self.nperseg = nperseg,
         self.noverlap = noverlap
 
@@ -119,7 +122,8 @@ class Resize(object):
         self.y_length = y_length
 
     def __call__(self, sample):
-        return cv2.resize(sample, (self.x_length, self.y_length))
+        # return cv2.resize(sample, (self.x_length, self.y_length))
+        return transform.resize(sample, (self.x_length, self.y_length))
 
 
 if __name__ == '__main__':
@@ -130,4 +134,6 @@ if __name__ == '__main__':
     print('split data')
     train, dev, test = split(df)
     print('load train set')
+    composed = transforms.Compose([Spectrogram(nperseg=1024, noverlap=768),
+                                   Resize(300, 300)])
     train = AcousticSceneDataset(train)
