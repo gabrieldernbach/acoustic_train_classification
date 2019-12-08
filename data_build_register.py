@@ -9,7 +9,7 @@ def extract_aup(aup_path):
     doc = ElementTree.parse(aup_path)
     root = doc.getroot()
 
-    # load wavfile
+    # load wave file
     xml_wave = r'{http://audacity.sourceforge.net/xml/}wavetrack'
     name = root.find(xml_wave).attrib['name'] + '.wav'
     print(f'extracting data point {name}')
@@ -51,4 +51,3 @@ if __name__ == '__main__':
                                        'label', 'detection'])
     print('safe file to "data_register.pkl"')
     data.to_pickle('data_register.pkl')
-    print('finished')

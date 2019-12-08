@@ -3,9 +3,11 @@ import os
 import xml.etree.ElementTree as ElementTree
 from typing import List, Tuple
 
+import cv2
 import librosa
 import numpy as np
 import pandas as pd
+from scipy.signal import spectrogram
 
 
 def mark_to_vec(marks_in_s, len_sequence):
@@ -29,6 +31,18 @@ def mark_to_vec(marks_in_s, len_sequence):
     return label_vec, durations, detection
 
 
+def resized_spectrogram(x):
+    def single_call(x):
+        # 1024 is 20ms frame with 1/4 overlap, corresponds to 4x oversampling in time domain
+        x = spectrogram(x, nperseg=1024, noverlap=768)[2]
+        # x = np.abs(stft(x, nperseg=1024, noverlap=786)[2])**2
+        x = cv2.resize(x, (300, 300))  # alternatively skimage.transform.resize (brighter but worse contrast?)
+        return x
+
+    return np.apply_along_axis(single_call, 1, x)
+    # return [single_call(x[i]) for i in range(len(x))]
+
+
 def extract_aup(aup_path):
     '''
     Extract audio and annotations from a single audacity project
@@ -43,8 +57,11 @@ def extract_aup(aup_path):
     xml_wave = r'{http://audacity.sourceforge.net/xml/}wavetrack'
     name = root.find(xml_wave).attrib['name'] + '.wav'
     print(f'extracting data point {name}')
-    audio = librosa.core.load(data_path + '/' + name, 8000, mono=False)[0][0, :]
+    audio = librosa.core.load(data_path + '/' + name, 48000, mono=False)[0][0, :]
+    audio = np.ascontiguousarray(audio)
     audio_len = len(audio)
+    audio = librosa.util.frame(audio, frame_length=96000, hop_length=24000).T
+    audio = resized_spectrogram(audio)
 
     # extract labels
     xml_label = r'{http://audacity.sourceforge.net/xml/}label'
@@ -54,8 +71,10 @@ def extract_aup(aup_path):
         end = element.attrib['t1']
         marks_in_s.append((start, end))
     label_vec, durations, detection = mark_to_vec(marks_in_s, audio_len)
+    label_vec = librosa.util.frame(label_vec, frame_length=96000, hop_length=24000)
+    labels = label_vec.sum(axis=1) / 96000
 
-    return station, name, audio, marks_in_s, label_vec, durations, detection
+    return station, name, audio, labels, detection
 
 
 if __name__ == '__main__':
@@ -80,8 +99,7 @@ if __name__ == '__main__':
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'name',
-                                       'audio', 'mark_in_s',
-                                       'label_vec', 'durations', 'detection'])
+                                       'audio', 'labels', 'detection'])
     print('safe file to "data.pkl"')
-    data.to_pickle('data.pkl')
+    data.to_pickle('data_image_classify.pkl')
     print('finished')
