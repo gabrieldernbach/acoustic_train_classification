@@ -1,3 +1,7 @@
+"""
+Basic Neural Net with
+"""
+
 import pickle
 
 import torch
@@ -58,7 +62,7 @@ class ONN(nn.Module):
 class sONN(nn.Module):
 
     def __init__(self):
-        super(ONN, self).__init__()
+        super(sONN, self).__init__()
         self.fc1 = nn.Linear(320, 100)
         self.drop1 = nn.Dropout(0.3)
         self.fc2 = nn.Linear(100, 40)
@@ -130,12 +134,12 @@ if __name__ == '__main__':
     X_test, S_test, Y_test = test
 
     Xm = X_train.mean(axis=0)
-    X_train -= Xm;
-    X_dev -= Xm;
+    X_train -= Xm
+    X_dev -= Xm
     X_test -= Xm
     Xs = X_train.std(axis=0).max()
-    X_train /= Xs;
-    X_dev /= Xs;
+    X_train /= Xs
+    X_dev /= Xs
     X_test /= Xs
     X_train = torch.from_numpy(X_train).unsqueeze(1)
     X_dev = torch.from_numpy(X_dev).unsqueeze(1)
@@ -147,7 +151,7 @@ if __name__ == '__main__':
     X_dev = X_dev.reshape(len(X_dev), 1, -1)
     X_test = X_test.reshape(len(X_test), 1, -1)
 
-    net = ONN()
+    net = sONN()
     net(X_train)
     train_model(model=net,
                 criterion=nn.BCELoss(),
@@ -175,7 +179,6 @@ if __name__ == '__main__':
 
     # # todo create classes for transforms
     #
-    # https: // pytorch.org / tutorials / beginner / data_loading_tutorial.html
     # pitchshift
     # amplitude
     # shift

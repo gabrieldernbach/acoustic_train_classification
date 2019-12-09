@@ -1,3 +1,12 @@
+"""
+Creates a register that locates files in given subdirectories
+and extracts the labels from provided aup projects.
+
+By default data is assumed to live in:
+    data/{station}/{*.aup}
+
+"""
+
 import os
 import xml.etree.ElementTree as ElementTree
 

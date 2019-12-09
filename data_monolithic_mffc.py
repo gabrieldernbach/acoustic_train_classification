@@ -1,3 +1,8 @@
+"""
+Create a monolithic mfcc dataset to reproduce legacy code such
+as the models in models_basic_classifier.py and models_basic_regressor.py
+"""
+
 import multiprocessing as mp
 import os
 import pickle

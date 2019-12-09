@@ -1,3 +1,8 @@
+"""
+Sets up the data loader with any pre processing applied.
+The dataset must be specified by a register locating the files. (see data_build_register.py)
+"""
+
 import librosa
 import numpy as np
 import pandas as pd

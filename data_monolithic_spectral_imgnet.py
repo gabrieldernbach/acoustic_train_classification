@@ -1,3 +1,7 @@
+"""
+Create monolithic dataset in imagenet format, such that popular models can be applied
+"""
+
 import multiprocessing as mp
 import os
 import xml.etree.ElementTree as ElementTree
