@@ -19,14 +19,12 @@ from utils import split
 
 
 def mark_to_vec(marks_in_s, len_sequence):
-    '''
+    """
     convert the marks ins seconds into a time series label vector
     and track durations of the marked sections
-    '''
-    durations = []
+    """
     mark_in_samp = []
     for mark in marks_in_s:
-        durations.append(float(mark[1]) - float(mark[0]))
         start = round(float(mark[0]) * 8000)
         end = round(float(mark[1]) * 8000)
         mark_in_samp.append([start, end])
@@ -36,15 +34,13 @@ def mark_to_vec(marks_in_s, len_sequence):
         label_vec[mark[0]:mark[1]] = 1
     detection = np.alltrue(label_vec == 0)
 
-    return label_vec, durations, detection
+    return label_vec, detection
 
 
 def extract_aup(aup_path):
-    '''
+    """
     Extract audio and annotations from a single audacity project
-    :param aup_path: abolute file path to audacity project
-    :return: station(global var), name, audio, marks_in_s, label_vec, durations
-    '''
+    """
     # parse xml
     doc = ElementTree.parse(aup_path)
     root = doc.getroot()
@@ -63,9 +59,9 @@ def extract_aup(aup_path):
         start = element.attrib['t']
         end = element.attrib['t1']
         marks_in_s.append((start, end))
-    label_vec, durations, detection = mark_to_vec(marks_in_s, audio_len)
+    label_vec, detection = mark_to_vec(marks_in_s, audio_len)
 
-    return station, name, audio, marks_in_s, label_vec, durations, detection
+    return station, audio, label_vec, detection
 
 
 def mfcc_vec(x):
@@ -115,12 +111,7 @@ if __name__ == '__main__':
         data.extend(station_data)
 
     print(len(data))
-    data = pd.DataFrame(data, columns=['station', 'name',
-                                       'audio', 'mark_in_s',
-                                       'label_vec', 'durations', 'detection'])
-    # print('safe file to "data.pkl"')
-    # data.to_pickle('data.pkl')
-    # data = pd.read_pickle('data.pkl')
+    data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
     print('split data')
     train, dev, test = split(data)
 

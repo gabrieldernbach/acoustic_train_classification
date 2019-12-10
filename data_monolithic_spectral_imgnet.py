@@ -15,16 +15,16 @@ from scipy.signal import spectrogram
 
 
 def mark_to_vec(marks_in_s, len_sequence):
-    '''
+    """
     convert the marks ins seconds into a time series label vector
     and track durations of the marked sections
-    '''
+    """
     durations = []
     mark_in_samp = []
     for mark in marks_in_s:
         durations.append(float(mark[1]) - float(mark[0]))
-        start = round(float(mark[0]) * 8000)
-        end = round(float(mark[1]) * 8000)
+        start = round(float(mark[0]) * 48000)
+        end = round(float(mark[1]) * 48000)
         mark_in_samp.append([start, end])
 
     label_vec = np.zeros(len_sequence)
@@ -39,7 +39,6 @@ def resized_spectrogram(x):
     def single_call(x):
         # 1024 is 20ms frame with 1/4 overlap, corresponds to 4x oversampling in time domain
         x = spectrogram(x, nperseg=1024, noverlap=768)[2]
-        # x = np.abs(stft(x, nperseg=1024, noverlap=786)[2])**2
         x = cv2.resize(x, (300, 300))  # alternatively skimage.transform.resize (brighter but worse contrast?)
         return x
 
@@ -48,11 +47,11 @@ def resized_spectrogram(x):
 
 
 def extract_aup(aup_path):
-    '''
+    """
     Extract audio and annotations from a single audacity project
     :param aup_path: abolute file path to audacity project
     :return: station(global var), name, audio, marks_in_s, label_vec, durations
-    '''
+    """
     # parse xml
     doc = ElementTree.parse(aup_path)
     root = doc.getroot()
@@ -78,7 +77,7 @@ def extract_aup(aup_path):
     label_vec = librosa.util.frame(label_vec, frame_length=96000, hop_length=24000)
     labels = label_vec.sum(axis=1) / 96000
 
-    return station, name, audio, labels, detection
+    return station, audio, labels, detection
 
 
 if __name__ == '__main__':
@@ -102,8 +101,7 @@ if __name__ == '__main__':
         data.extend(station_data)
 
     print(len(data))
-    data = pd.DataFrame(data, columns=['station', 'name',
-                                       'audio', 'labels', 'detection'])
+    data = pd.DataFrame(data, columns=['station', 'audio', 'labels', 'detection'])
     print('safe file to "data.pkl"')
     data.to_pickle('data_image_classify.pkl')
     print('finished')
