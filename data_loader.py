@@ -124,9 +124,7 @@ class PitchShift(object):
 class AdjustAmplitude(object):
 
     def __init__(self, offset_in_db):
-        offset_absolute =
-
-    # todo
+        # todo
 
     def __call__(self, amount):
         pass

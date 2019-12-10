@@ -7,7 +7,8 @@ from sklearn.metrics import roc_auc_score
 from sklearn.neural_network import MLPRegressor
 
 
-def evaluate_clf():
+def evaluate_model(clf):
+    print(f'\n{clf.__class__}\n')
     clf.fit(X_train, Y_train)
 
     print('=== Training Set Performance ===')
@@ -30,34 +31,43 @@ def evaluate_clf():
     print('roc auc:', roc_auc_score(Y_test_binary, test_predict))
 
 
-if __name__ == '__main__':
-    datapath = 'data_monolithic_mfcc.pkl'
+def load_data(datapath):
     if os.path.exists(datapath):
         train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
     else:
         os.system('data_monolithic_mfcc_py')
         train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
+    return train, dev, test
+
+
+def normalize_data(train, dev, test):
+    train_mean = train.mean(axis=0, keepdims=1)
+    train_variance = (train - train_mean).var(axis=0, keepdims=1)
+
+    train = (train - train_mean) / train_variance
+    dev = (dev - train_mean) / train_variance
+    test = (test - train_mean) / train_variance
+    return train, dev, test
+
+
+clf = {
+
+    'GBRT': HistGradientBoostingRegressor(loss='least_squares',
+                                          max_iter=400, validation_fraction=0.1,
+                                          verbose=1),
+
+    'MLP': MLPRegressor(hidden_layer_sizes=(50, 20),
+                        learning_rate_init=0.001, max_iter=400,
+                        random_state=1, verbose=True, early_stopping=True)
+}
+
+if __name__ == '__main__':
+    train, dev, test = load_data('data_monolithic_mfcc.pkl')
 
     X_train, S_train, Y_train = train
     X_dev, S_dev, Y_dev = dev
     X_test, S_test, Y_test = test
+    X_train, X_dev, X_test = normalize_data(X_train, X_dev, X_test)
 
-    clf = HistGradientBoostingRegressor(loss='least_squares',
-                                        max_iter=400, validation_fraction=0.1,
-                                        verbose=1)
-    print('\n Gradient Boosted Tree \n')
-    evaluate_clf()
-
-    # noramlize data
-    Xmean = X_train.mean(axis=0, keepdims=1)
-    Xvar = (X_train - Xmean).var(axis=0, keepdims=1)
-
-    X_train = (X_train - Xmean) / Xvar
-    X_dev = (X_dev - Xmean) / Xvar
-    X_test = (X_test - Xmean) / Xvar
-
-    clf = MLPRegressor(hidden_layer_sizes=(100, 60, 40, 20),
-                       learning_rate_init=0.001, max_iter=400,
-                       random_state=1, verbose=True, early_stopping=True)
-    print('\n MLPRegressor with normalization \n')
-    evaluate_clf()
+    evaluate_model(clf['GBRT'])
+    evaluate_model(clf['MLP'])

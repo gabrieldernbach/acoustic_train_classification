@@ -1,5 +1,5 @@
 """
-Basic Neural Net with
+Basic Convolutional Neural Net
 """
 
 import pickle
@@ -42,41 +42,6 @@ class CNN(nn.Module):
         for s in size:
             num_features *= s
         return num_features
-
-
-class ONN(nn.Module):
-
-    def __init__(self):
-        super(ONN, self).__init__()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, 20)
-        self.fc3 = nn.Linear(20, 1)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = torch.sigmoid(self.fc3(x))
-        return x
-
-
-class sONN(nn.Module):
-
-    def __init__(self):
-        super(sONN, self).__init__()
-        self.fc1 = nn.Linear(320, 100)
-        self.drop1 = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(100, 40)
-        self.drop2 = nn.Dropout(0.3)
-        self.fc3 = nn.Linear(40, 20)
-        self.drop3 = nn.Dropout(0.3)
-        self.fc4 = nn.Linear(20, 1)
-
-    def forward(self, x):
-        x = self.drop1(F.relu(self.fc1(x)))
-        x = self.drop2(F.relu(self.fc2(x)))
-        x = self.drop3(F.relu(self.fc3(x)))
-        x = torch.sigmoid(self.fc4(x))
-        return x
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):
@@ -177,11 +142,3 @@ if __name__ == '__main__':
     print(confusion_matrix(Y_test_binary, test_predict > .25))
     print(roc_auc_score(Y_test_binary, test_predict))
 
-    # # todo create classes for transforms
-    #
-    # pitchshift
-    # amplitude
-    # shift
-    # mixup
-    # to
-    # tensor
