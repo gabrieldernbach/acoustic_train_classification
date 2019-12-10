@@ -124,10 +124,11 @@ class PitchShift(object):
 class AdjustAmplitude(object):
 
     def __init__(self, offset_in_db):
-        # todo
+        self.offset_in_db = offset_in_db
+        self.factor = 10 ** (offset_in_db / 20)
 
-    def __call__(self, amount):
-        pass
+    def __call__(self, sample):
+        return self.factor * sample
 
 
 class Spectrogram(object):

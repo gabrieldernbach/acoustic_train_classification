@@ -6,6 +6,17 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 from sklearn.neural_network import MLPRegressor
 
+from utils import normalize_data
+
+
+def load_data(datapath):
+    if os.path.exists(datapath):
+        train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
+    else:
+        os.system('data_monolithic_mfcc_py')
+        train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
+    return train, dev, test
+
 
 def evaluate_model(clf):
     print(f'\n{clf.__class__}\n')
@@ -29,25 +40,6 @@ def evaluate_model(clf):
     test_predict = clf.predict(X_test)
     print('confusion:\n', confusion_matrix(Y_test_binary, test_predict > .25))
     print('roc auc:', roc_auc_score(Y_test_binary, test_predict))
-
-
-def load_data(datapath):
-    if os.path.exists(datapath):
-        train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
-    else:
-        os.system('data_monolithic_mfcc_py')
-        train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
-    return train, dev, test
-
-
-def normalize_data(train, dev, test):
-    train_mean = train.mean(axis=0, keepdims=1)
-    train_variance = (train - train_mean).var(axis=0, keepdims=1)
-
-    train = (train - train_mean) / train_variance
-    dev = (dev - train_mean) / train_variance
-    test = (test - train_mean) / train_variance
-    return train, dev, test
 
 
 clf = {
