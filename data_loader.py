@@ -33,7 +33,7 @@ class AcousticSceneDataset(Dataset):
         self.audio, self.label, self.station = self.load_in_frames(data_register)
 
     def read_from_register(self, idx):
-        print(f'read {idx}')
+        print(f'reading entry {idx}')
         # load and frame audio
         audio_path = self.data_register.audio_path[idx]
         audio_raw = librosa.core.load(audio_path,
@@ -48,7 +48,7 @@ class AcousticSceneDataset(Dataset):
         label_framed = librosa.util.frame(label_vec,
                                           frame_length=self.frame_length,
                                           hop_length=self.hop_length)
-        return audio_framed, label_framed
+        return (audio_framed, label_framed)
 
     def load_in_frames(self, data_register):
         """
@@ -60,8 +60,9 @@ class AcousticSceneDataset(Dataset):
         print('starting pool')
         with mp.Pool(mp.cpu_count()) as p:
             data_framed = p.map(self.read_from_register, range(len(self.data_register)))
+        # data_framed = [self.read_from_register(i) for i in range(len(self.data_register))]
 
-        audio, labels = list(zip(*data_framed))
+        audio, label = list(zip(*data_framed))
         print('concatenate audio')
         audio = np.concatenate(audio, axis=-1).T
         print('concatenate labels')
