@@ -3,13 +3,14 @@ Sets up the data loader with any pre processing applied.
 The dataset must be specified by a register locating the files. (see data_build_register.py)
 """
 
+import multiprocessing as mp
+
 import librosa
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from tqdm import tqdm
 
 from augmentations import Resize, Spectrogram
 from utils import split
@@ -17,16 +18,37 @@ from utils import split
 
 class AcousticSceneDataset(Dataset):
 
-    def __init__(self, data_register,
+    def __init__(self,
+                 data_register,
                  transform=None,
-                 sr=24000, frame_length=48000,
+                 sr=24000,
+                 frame_length=48000,
                  hop_length=12000):
+        self.data_register = data_register
         self.frame_length = frame_length
         self.transform = transform
         self.hop_length = hop_length
         self.sr = sr
 
         self.audio, self.label, self.station = self.load_in_frames(data_register)
+
+    def read_from_register(self, idx):
+        print(f'read {idx}')
+        # load and frame audio
+        audio_path = self.data_register.audio_path[idx]
+        audio_raw = librosa.core.load(audio_path,
+                                      sr=self.sr,
+                                      mono=False)[0][0, :]
+        audio_raw = np.ascontiguousarray(audio_raw)
+        audio_framed = librosa.util.frame(audio_raw,
+                                          frame_length=self.frame_length,
+                                          hop_length=self.hop_length)
+        # load and frame labels
+        label_vec = self.label_to_vec(self.data_register.label[idx], len(audio_raw))
+        label_framed = librosa.util.frame(label_vec,
+                                          frame_length=self.frame_length,
+                                          hop_length=self.hop_length)
+        return audio_framed, label_framed
 
     def load_in_frames(self, data_register):
         """
@@ -35,25 +57,11 @@ class AcousticSceneDataset(Dataset):
         stations are one hot encoded alphabetically
         """
         audio, label = [], []
-        for i in tqdm(range(len(data_register))):
-            # load and frame audio
-            audio_path = data_register.audio_path[i]
-            audio_raw = librosa.core.load(audio_path,
-                                          sr=self.sr,
-                                          mono=False)[0][0, :]
-            audio_raw = np.ascontiguousarray(audio_raw)
-            audio_framed = librosa.util.frame(audio_raw,
-                                              frame_length=self.frame_length,
-                                              hop_length=self.hop_length)
-            audio.append(audio_framed)
+        print('starting pool')
+        with mp.Pool(mp.cpu_count()) as p:
+            data_framed = p.map(self.read_from_register, range(len(self.data_register)))
 
-            # load and frame labels
-            label_vec = self.label_to_vec(data_register.label[i], len(audio_raw))
-            label_framed = librosa.util.frame(label_vec,
-                                              frame_length=self.frame_length,
-                                              hop_length=self.hop_length)
-            label.append(label_framed)
-
+        audio, labels = list(zip(*data_framed))
         print('concatenate audio')
         audio = np.concatenate(audio, axis=-1).T
         print('concatenate labels')
@@ -98,8 +106,6 @@ class AcousticSceneDataset(Dataset):
 
     def __repr__(self):
         return f'{self.__class__.__name__}'
-
-
 
 
 if __name__ == '__main__':
