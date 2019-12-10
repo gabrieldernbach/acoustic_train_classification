@@ -84,13 +84,13 @@ class AcousticSceneDataset(Dataset):
         sample = self.audio[item]
         target = self.label[item]
 
+        # todo implement mixup
+
         if self.transform:
             sample = self.transform(sample)
 
         sample = torch.from_numpy(sample)
         target = torch.from_numpy(target)
-
-        # todo implement mixup
 
         return sample, target
 
@@ -101,10 +101,38 @@ class AcousticSceneDataset(Dataset):
         return f'{self.__class__.__name__}'
 
 
+class PitchShift(object):
+
+    def __init__(self,
+                 sr=48000,
+                 n_steps=4,
+                 bins_per_octave=24.,
+                 res_type='kaiser_fast'):
+        self.sr = sr
+        self.n_steps = n_steps
+        self.bins_per_octave = bins_per_octave
+        self.res_type = res_type
+
+    def __call__(self, sample):
+        sample = librosa.effects.pitch_shift(self.sr,
+                                             self.n_steps,
+                                             self.bins_per_octave,
+                                             self.res_type)
+        return sample
+
+
+class AdjustAmplitude(object):
+
+    def __init__(self, offset_in_db):
+        offset_absolute =
+
+    # todo
+
+    def __call__(self, amount):
+        pass
+
+
 class Spectrogram(object):
-    """
-    compute spectrogram of given 1d sequence
-    """
 
     def __init__(self, nperseg=1024, noverlap=768):
         self.nperseg = nperseg,
@@ -117,10 +145,16 @@ class Spectrogram(object):
         return spec[2]
 
 
+class PercussiveSeparation(object):
+
+    def __init__(self, margin=3.0):
+        self.margin = margin
+
+    def __call__(self, sample):
+        return librosa.effects.percussive(sample, self.margin)
+
+
 class Resize(object):
-    """
-    resize 2d input to target in pixels
-    """
 
     def __init__(self, x_length, y_length):
         self.x_length = x_length

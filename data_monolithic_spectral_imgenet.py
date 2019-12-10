@@ -1,9 +1,11 @@
 """
-Create monolithic dataset in imagenet format, such that popular models can be applied
+Create monolithic dataset in imagenet format,
+Pre trained Networks can be applied
 """
 
 import multiprocessing as mp
 import os
+import pickle
 import xml.etree.ElementTree as ElementTree
 from typing import List, Tuple
 
@@ -12,6 +14,8 @@ import librosa
 import numpy as np
 import pandas as pd
 from scipy.signal import spectrogram
+
+from utils import split
 
 
 def mark_to_vec(marks_in_s, len_sequence):
@@ -30,9 +34,8 @@ def mark_to_vec(marks_in_s, len_sequence):
     label_vec = np.zeros(len_sequence)
     for mark in mark_in_samp:
         label_vec[mark[0]:mark[1]] = 1
-    detection = np.alltrue(label_vec == 0)
 
-    return label_vec, durations, detection
+    return label_vec, durations
 
 
 def resized_spectrogram(x):
@@ -73,11 +76,11 @@ def extract_aup(aup_path):
         start = element.attrib['t']
         end = element.attrib['t1']
         marks_in_s.append((start, end))
-    label_vec, durations, detection = mark_to_vec(marks_in_s, audio_len)
+    label_vec, durations = mark_to_vec(marks_in_s, audio_len)
     label_vec = librosa.util.frame(label_vec, frame_length=96000, hop_length=24000)
     labels = label_vec.sum(axis=1) / 96000
 
-    return station, audio, labels, detection
+    return audio, station, labels
 
 
 if __name__ == '__main__':
@@ -101,7 +104,13 @@ if __name__ == '__main__':
         data.extend(station_data)
 
     print(len(data))
-    data = pd.DataFrame(data, columns=['station', 'audio', 'labels', 'detection'])
-    print('safe file to "data.pkl"')
-    data.to_pickle('data_image_classify.pkl')
+    data = pd.DataFrame(data, columns=['audio', 'station', 'labels'])
+    train, dev, test = split(data)
+
+    train = (train.audio, train.station, train.labels)
+    dev = (dev.audio, dev.station, dev.labels)
+    test = (test.audio, test.station, test.labels)
+    data = (train, dev, test)
+    print('safe file to "data_monolithic_imagenet.pkl"')
+    pickle.dump(data, open('data_monolithic_imagenet.pkl', 'wb'))
     print('finished')

@@ -120,4 +120,4 @@ if __name__ == '__main__':
     dev = transform(dev)
     test = transform(test)
     data = (train, dev, test)
-    pickle.dump(data, open('data_split_mfcc_station.pkl', 'wb'))
+    pickle.dump(data, open('data_monolithic_mfcc.pkl', 'wb'))

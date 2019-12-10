@@ -1,7 +1,7 @@
 """
 Basic Neural Net with
 """
-
+import os
 import pickle
 
 import torch
@@ -11,40 +11,10 @@ import torch.optim as optim
 from sklearn.metrics import confusion_matrix, roc_auc_score
 
 
-class CNN(nn.Module):
-
-    def __init__(self):
-        super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 3)
-        self.do1 = nn.Dropout(0.3)
-        self.conv2 = nn.Conv2d(6, 16, 3)
-        self.do2 = nn.Dropout(0.3)
-        # an affine operation: y = Wx + b
-        self.fc1 = nn.Linear(16 * 2 * 3, 120)  # is there an easy way to know the dim?
-        self.do3 = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(120, 84)
-        self.do4 = nn.Dropout(0.3)
-        self.fc3 = nn.Linear(84, 1)
-
-    def forward(self, x):
-        # Max pooling over a (2, 2) window
-        x = F.max_pool2d(self.do1(F.relu(self.conv1(x))), (2, 2))
-        x = F.max_pool2d(self.do2(F.relu(self.conv2(x))), 2)
-        x = x.view(-1, self.num_flat_features(x))
-        x = self.do3(F.relu(self.fc1(x)))
-        x = self.do4(F.relu(self.fc2(x)))
-        x = torch.sigmoid(self.fc3(x).squeeze())
-        return x
-
-    def num_flat_features(self, x):
-        size = x.size()[1:]  # all dimensions except the batch dimension
-        num_features = 1
-        for s in size:
-            num_features *= s
-        return num_features
-
-
 class ONN(nn.Module):
+    """
+    Ordinary Neural Network
+    """
 
     def __init__(self):
         super(ONN, self).__init__()
@@ -59,7 +29,10 @@ class ONN(nn.Module):
         return x
 
 
-class sONN(nn.Module):
+class dONN(nn.Module):
+    """
+    Neural Network with drop out regularization
+    """
 
     def __init__(self):
         super(sONN, self).__init__()
@@ -89,8 +62,8 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
         model.train()
 
         for beg_i in range(0, X_train.size(0), batch_size):
-            x_batch = X_train[beg_i:beg_i + batch_size, :]  # optionally .to(device)
-            y_batch = Y_train[beg_i:beg_i + batch_size]  # optionally .to(device)
+            x_batch = X_train[beg_i:beg_i + batch_size, :]
+            y_batch = Y_train[beg_i:beg_i + batch_size]
 
             optimizer.zero_grad()
             output = model(x_batch)
@@ -109,25 +82,19 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
             if eps < early_stop_criterion:
                 print('early stopping criterion met')
                 break
-        print(f'epoche {epoch}, loss = {loss.item()}')
+        print(f'epoch {epoch}, loss = {loss.item()}')
 
     return training_loss, validation_loss
 
 
 if __name__ == '__main__':
     print('read data set')
-    #    for station in ['VLD', 'BHV', 'BRL']:
-    #         data = pd.read_pickle('data.pkl')
-    #         data = data[data.station == station] # BHV, VLD, BRL
-    #         print('split data')
-    #         train, dev, test = mfcc_constructor.split(data)
-    #
-    #         print('start feature extraction')
-    #         train = mfcc_constructor.transform(train)
-    #         dev = mfcc_constructor.transform(dev)
-    #         test = mfcc_constructor.transform(test)
-    data = pickle.load(open('data_split_mfcc_station.pkl', 'rb'))
-    train, dev, test = data
+    datapath = 'data_monolithic_mfcc.pkl'
+    if os.path.exists(datapath):
+        train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
+    else:
+        os.system('data_monolithic_mfcc_py')
+        train, dev, test = pickle.load(open('data_monolithic_mfcc.pkl', 'rb'))
 
     X_train, S_train, Y_train = train
     X_dev, S_dev, Y_dev = dev
@@ -177,11 +144,3 @@ if __name__ == '__main__':
     print(confusion_matrix(Y_test_binary, test_predict > .25))
     print(roc_auc_score(Y_test_binary, test_predict))
 
-    # # todo create classes for transforms
-    #
-    # pitchshift
-    # amplitude
-    # shift
-    # mixup
-    # to
-    # tensor
