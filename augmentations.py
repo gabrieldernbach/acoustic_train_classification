@@ -1,3 +1,4 @@
+import numpy as np
 from librosa.effects import pitch_shift, percussive
 from scipy.signal import spectrogram
 from skimage.transform import resize
@@ -57,10 +58,19 @@ class PercussiveSeparation(object):
 
 class Resize(object):
 
-    def __init__(self, x_length, y_length):
+    def __init__(self, x_length=300, y_length=300):
         self.x_length = x_length
         self.y_length = y_length
 
     def __call__(self, sample):
         # return cv2.resize(sample, (self.x_length, self.y_length))
         return resize(sample, (self.x_length, self.y_length))
+
+
+class ExpandDim(object):
+
+    def __init__(self, axis=0):
+        self.axis = axis
+
+    def __call__(self, sample):
+        return np.expand_dims(sample, self.axis)

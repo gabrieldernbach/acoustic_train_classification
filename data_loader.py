@@ -56,8 +56,8 @@ class AcousticSceneDataset(Dataset):
         applies framing to audio and labels
         stations are one hot encoded alphabetically
         """
-        audio, label = [], []
         print('starting pool')
+        data_register.reset_index(inplace=True)
         with mp.Pool(mp.cpu_count()) as p:
             data_framed = p.map(self.read_from_register, range(len(self.data_register)))
         # data_framed = [self.read_from_register(i) for i in range(len(self.data_register))]
@@ -66,9 +66,9 @@ class AcousticSceneDataset(Dataset):
         print('concatenate audio')
         audio = np.concatenate(audio, axis=-1).T
         print('concatenate labels')
-        labels = np.concatenate(label, axis=-1)
+        labels = np.concatenate(label, axis=-1).T
         print('perform one hot encoding')
-        station = np.array(pd.get_dummies(train.station))
+        station = np.array(pd.get_dummies(data_register.station))
 
         return audio, labels, station
 
@@ -97,8 +97,11 @@ class AcousticSceneDataset(Dataset):
         if self.transform:
             sample = self.transform(sample)
 
+        target = np.array(target.sum() / self.frame_length).astype('float32')
+        target = np.expand_dims(target, 0)
+
         sample = torch.from_numpy(sample)
-        target = torch.from_numpy(target)
+        target = torch.from_numpy(target).float()
 
         return sample, target
 
