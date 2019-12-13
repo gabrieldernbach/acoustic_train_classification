@@ -35,7 +35,7 @@ class dONN(nn.Module):
     """
 
     def __init__(self):
-        super(sONN, self).__init__()
+        super(dONN, self).__init__()
         self.fc1 = nn.Linear(320, 100)
         self.drop1 = nn.Dropout(0.3)
         self.fc2 = nn.Linear(100, 40)
@@ -118,7 +118,7 @@ if __name__ == '__main__':
     X_dev = X_dev.reshape(len(X_dev), 1, -1)
     X_test = X_test.reshape(len(X_test), 1, -1)
 
-    net = sONN()
+    net = dONN()
     net(X_train)
     train_model(model=net,
                 criterion=nn.BCELoss(),

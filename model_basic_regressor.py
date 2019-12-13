@@ -54,7 +54,7 @@ clf = {
 }
 
 if __name__ == '__main__':
-    train, dev, test = load_data('data_monolithic_mfcc.pkl')
+    train, dev, test = load_data('data_monolithic_mfcc_all.pkl')
 
     X_train, S_train, Y_train = train
     X_dev, S_dev, Y_dev = dev

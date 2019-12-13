@@ -91,6 +91,7 @@ def transform(dataset):
 
 
 if __name__ == '__main__':
+    save_subsets = True
     cwd = os.getcwd()
     stations = os.listdir(cwd + '/data')
     stations = [s for s in stations if not s.startswith('.')]
@@ -109,6 +110,19 @@ if __name__ == '__main__':
             station_data = p.starmap(extract_aup, project_paths)
 
         data.extend(station_data)
+
+        if save_subsets == True:
+            # safe subset of data
+            data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
+            print('split data')
+            train, dev, test = split(data)
+
+            print('start feature extraction')
+            train = transform(train)
+            dev = transform(dev)
+            test = transform(test)
+            data = (train, dev, test)
+            pickle.dump(data, open(f'data_monolithic_mfcc_{station}.pkl', 'wb'))
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])

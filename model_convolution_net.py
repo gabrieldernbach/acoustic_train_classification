@@ -44,39 +44,6 @@ class Net(nn.Module):
         return output
 
 
-class CNN(nn.Module):
-
-    def __init__(self):
-        super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 3)
-        self.do1 = nn.Dropout(0.3)
-        self.conv2 = nn.Conv2d(6, 16, 3)
-        self.do2 = nn.Dropout(0.3)
-        # an affine operation: y = Wx + b
-        self.fc1 = nn.Linear(16 * 2 * 3, 120)
-        self.do3 = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(120, 84)
-        self.do4 = nn.Dropout(0.3)
-        self.fc3 = nn.Linear(84, 1)
-
-    def forward(self, x):
-        # Max pooling over a (2, 2) window
-        x = F.max_pool2d(self.do1(F.relu(self.conv1(x))), (2, 2))
-        x = F.max_pool2d(self.do2(F.relu(self.conv2(x))), 2)
-        x = x.view(-1, self.num_flat_features(x))
-        x = self.do3(F.relu(self.fc1(x)))
-        x = self.do4(F.relu(self.fc2(x)))
-        x = torch.sigmoid(self.fc3(x).squeeze())
-        return x
-
-    def num_flat_features(self, x):
-        size = x.size()[1:]  # all dimensions except the batch dimension
-        num_features = 1
-        for s in size:
-            num_features *= s
-        return num_features
-
-
 def train(args, model, device, train_loader, dev_loader, optimizer, epoch):
     early_stop_criterion = 1e-13
     running_loss = 0.0
@@ -102,8 +69,6 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
     validation_loss = []
     early_stop_criterion = 1e-13
     for epoch in range(num_epochs):
-        running_loss = 0.0
-        batch_size = 5000
         model.train()
 
         running_loss = 0.0
@@ -168,10 +133,9 @@ if __name__ == '__main__':
 
     torch.save(net.state_dict(), 'efficient_net1')
 
-    # # print(f'\n\n\n Results for {station}')
+    # print(f'\n\n\n Results for {station}')
     # print('=== Training Set Performance ===')
     # Y_train_binary = Y_train.numpy() > .25
-    # train_predict = net(X_train).detach().numpy().flatten()
     # print(confusion_matrix(Y_train_binary, train_predict > .25))
     # print(roc_auc_score(Y_train_binary, train_predict))
     # print('=== Dev Set Performance ===')
@@ -184,4 +148,3 @@ if __name__ == '__main__':
     # test_predict = net(X_test).detach().numpy().flatten()
     # print(confusion_matrix(Y_test_binary, test_predict > .25))
     # print(roc_auc_score(Y_test_binary, test_predict))
-    #
