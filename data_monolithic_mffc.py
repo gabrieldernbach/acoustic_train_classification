@@ -113,16 +113,16 @@ if __name__ == '__main__':
 
         if save_subsets == True:
             # safe subset of data
-            data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
+            df = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
             print('split data')
-            train, dev, test = split(data)
+            train, dev, test = split(df)
 
             print('start feature extraction')
             train = transform(train)
             dev = transform(dev)
             test = transform(test)
-            data = (train, dev, test)
-            pickle.dump(data, open(f'data_monolithic_mfcc_{station}.pkl', 'wb'))
+            df = (train, dev, test)
+            pickle.dump(df, open(f'data_monolithic_mfcc_{station}.pkl', 'wb'))
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])

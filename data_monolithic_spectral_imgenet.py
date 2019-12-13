@@ -1,6 +1,7 @@
 """
 Create monolithic dataset in imagenet format,
 Pre trained Networks can be applied
+Beware that after transform the dataset still consumes 20 GB of memory
 """
 
 import multiprocessing as mp

@@ -1,5 +1,10 @@
 """
-Basic Neural Net with
+Basic Neural Net with 320 inputs,
+hidden layers of 50 and 20 and scalar logistic output.
+
+Inputs are assumed to be flattened mfccs (20 n_mfcc x 16 steps = 320 features)
+Targets are either the binary labels of detection {0, 1},
+or the amount of samples in the section labeled as detected [0, 1].
 """
 import os
 import pickle
