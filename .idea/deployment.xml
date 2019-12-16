@@ -5,7 +5,7 @@
       <paths name="cluster_tu">
         <serverdata>
           <mappings>
-            <mapping deploy="projects/acoustic_train_class" local="$PROJECT_DIR$" web="projects/acoustic_train_class" />
+            <mapping deploy="/projects/acoustic_train_class" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

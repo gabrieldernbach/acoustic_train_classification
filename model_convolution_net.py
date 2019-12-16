@@ -6,7 +6,6 @@ import pickle
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from efficientnet_pytorch import EfficientNet
 from torch.utils.data import DataLoader
@@ -15,53 +14,6 @@ from torchvision import transforms
 from augmentations import Spectrogram, Resize, ExpandDim
 from data_loader import AcousticSceneDataset
 from utils import split
-
-
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(1, 32, 3, 1)
-        self.conv3 = nn.Conv2d(32, 64, 3, 1)
-        self.conv4 = nn.Conv2d(64, 128, 3, 1)
-        self.dropout1 = nn.Dropout2d(0.25)
-        self.dropout2 = nn.Dropout2d(0.5)
-        self.fc1 = nn.Linear(9216, 128)
-        self.fc2 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.conv2(x)
-        x = F.max_pool2d(x, 2)
-        x = self.dropout1(x)
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.dropout2(x)
-        x = self.fc2(x)
-        output = F.log_softmax(x, dim=1)
-        return output
-
-
-def train(args, model, device, train_loader, dev_loader, optimizer, epoch):
-    early_stop_criterion = 1e-13
-    running_loss = 0.0
-
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-
-        running_loss += loss.item()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.item()))
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):
@@ -73,7 +25,7 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
 
         running_loss = 0.0
         for batch_idx, (data, target) in enumerate(train_loader):
-            print(f'processing training on {batch_idx}')
+            print(f'processing training on epoch {epoch} batch {batch_idx}')
             optimizer.zero_grad()
             output = model(data)
             loss = criterion(output, target)
@@ -81,6 +33,7 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
             optimizer.step()
 
             running_loss += loss.item()
+        print(f'total training loss {running_loss}')
         training_loss.append(running_loss)
 
         model.eval()
@@ -90,15 +43,14 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
             output = model(data)
             loss = criterion(output, target)
             running_loss += loss.item()
-
+        print(f'total validation loss {running_loss}')
         validation_loss.append(running_loss)
-        print(f'validation loss is {validation_loss[-1]}')
-        if (early_stopping is True) and (epoch > 30):
-            eps = validation_loss[epoch - 30] - validation_loss[epoch]
+
+        if (early_stopping is True) and (epoch > 10):
+            eps = validation_loss[epoch - 10] - validation_loss[epoch]
             if eps < early_stop_criterion:
                 print('early stopping criterion met')
                 break
-        print(f'epoche {epoch}, loss = {loss.item()}')
 
     return training_loss, validation_loss
 
@@ -126,7 +78,7 @@ if __name__ == '__main__':
     train_model(model=net,
                 criterion=nn.BCELoss(),
                 optimizer=optim.Adam(net.parameters(),
-                                     lr=0.001,
+                                     lr=0.01,
                                      betas=(0.9, 0.999)),
                 num_epochs=400,
                 early_stopping=True)
