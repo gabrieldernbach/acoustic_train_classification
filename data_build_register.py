@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ElementTree
 import pandas as pd
 
 
-def extract_aup(aup_path):
+def extract_aup(aup_path, data_path, station, verbose=1):
     # parse xml
     doc = ElementTree.parse(aup_path)
     root = doc.getroot()
@@ -21,7 +21,8 @@ def extract_aup(aup_path):
     # load wave file
     xml_wave = r'{http://audacity.sourceforge.net/xml/}wavetrack'
     name = root.find(xml_wave).attrib['name'] + '.wav'
-    print(f'extracting data point {name}')
+    if verbose > 0:
+        print(f'extracting data point {name}')
     audio_path = f'{data_path}/{name}'
 
     # extract labels
@@ -51,7 +52,7 @@ if __name__ == '__main__':
         project_paths = [os.path.join(data_path, aup) for aup in audacity_projects]
         print(f'found {len(project_paths)} files')
 
-        station_data = [extract_aup(i) for i in project_paths]
+        station_data = [extract_aup(i, data_path, station) for i in project_paths]
 
         data.extend(station_data)
 
