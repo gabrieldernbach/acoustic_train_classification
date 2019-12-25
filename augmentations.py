@@ -1,3 +1,8 @@
+"""
+collect classes for feature augmentations that
+can be readily called inside the training loader via trainsforms = [ ... ]
+"""
+
 import numpy as np
 from librosa.effects import pitch_shift, percussive
 from scipy.signal import spectrogram

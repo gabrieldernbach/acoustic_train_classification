@@ -1,5 +1,5 @@
 """
-Generate Exploratory Information about the provided Dataset,
+Generate exploratory information about the provided dataset,
 such as how many files, their play time, and the extend to which we can find labels.
 """
 
@@ -9,6 +9,7 @@ from librosa.core import get_duration
 
 from data_build_register import extract_aup
 
+# collect all wav files
 cwd = os.getcwd()
 stations = os.listdir(cwd + '/data')
 stations = [s for s in stations if not s.startswith('.')]
@@ -25,6 +26,7 @@ print(f'we found {len(audio_paths)} audio files in total')
 lens = [get_duration(filename=f) for f in audio_paths]
 print(f'their total play time amounts to {sum(lens) / 60 / 60:.2f} hours')
 
+# collect all aup files
 labeled_data = []
 for station in stations:
     data_path = f'{cwd}/data/{station}'
@@ -36,7 +38,7 @@ for station in stations:
 
 print(f'{len(labeled_data)} instances have labeles provided')
 
-# detections
+# infer amount of detections
 labeled_lens = [get_duration(filename=f[1]) for f in labeled_data]
 print(f"their total play time amounts to {sum(labeled_lens) / 60 / 60}")
 number_detections = sum([f[3] for f in labeled_data])
