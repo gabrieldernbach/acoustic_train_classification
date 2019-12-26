@@ -4,7 +4,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 
-from utils import load_monolithic
+from baseline_fully_connected.utils import load_monolithic
 
 
 def evaluate(clf, inputs, labels):
@@ -34,7 +34,7 @@ clf = {
 
     'GBRT': HistGradientBoostingRegressor(loss='least_squares',
                                           max_iter=200, validation_fraction=0.1,
-                                          verbose=False),
+                                          verbose=True),
 
     'MLPRegressor': MLPRegressor(hidden_layer_sizes=(50, 20),
                                  learning_rate_init=0.01, max_iter=400,

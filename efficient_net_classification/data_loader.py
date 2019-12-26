@@ -1,5 +1,5 @@
 """
-Sets up the data loader with any pre processing applied.
+Sets up the data loader with customizable pre processing.
 The dataset must be specified by a register locating the files. (see data_build_register.py)
 """
 
@@ -12,8 +12,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from augmentations import Resize, Spectrogram
-from utils import split
+from baseline_fully_connected.utils import split
+from efficient_net_classification.augmentations import Resize, Spectrogram
 
 
 class AcousticSceneDataset(Dataset):
@@ -48,12 +48,12 @@ class AcousticSceneDataset(Dataset):
         label_framed = librosa.util.frame(label_vec,
                                           frame_length=self.frame_length,
                                           hop_length=self.hop_length)
-        return (audio_framed, label_framed)
+        return audio_framed, label_framed
 
     def load_in_frames(self, data_register):
         """
-        loads instances listed in data_register
-        applies framing to audio and labels
+        loads instances listed in data_register,
+        applies framing to audio and labels,
         stations are one hot encoded alphabetically
         """
         print('starting pool')
@@ -114,12 +114,12 @@ class AcousticSceneDataset(Dataset):
 
 if __name__ == '__main__':
     print('read register')
-    df = pd.read_pickle('data_register.pkl')
+    df = pd.read_pickle('../data/data_register.pkl')
     # optionally condition on station
     # df = df[df.station['VHB']]
     print('split data')
     train, dev, test = split(df)
     print('load train set')
     composed = transforms.Compose([Spectrogram(nperseg=1024, noverlap=768),
-                                   Resize(300, 300)])
+                                   Resize(224, 224)])
     train = AcousticSceneDataset(train)

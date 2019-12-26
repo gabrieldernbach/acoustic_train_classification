@@ -1,12 +1,14 @@
 <component name="ProjectDictionaryState">
   <dictionary name="gabrieldernbach">
     <words>
+      <w>bilinear</w>
       <w>convolutional</w>
       <w>datapath</w>
       <w>devloader</w>
       <w>gbrt</w>
       <w>imagenet</w>
       <w>mfcc</w>
+      <w>mfccs</w>
       <w>mixup</w>
       <w>noverlap</w>
       <w>nperseg</w>
@@ -15,6 +17,7 @@
       <w>repitch</w>
       <w>testloader</w>
       <w>trainloader</w>
+      <w>vectorize</w>
       <w>xvar</w>
     </words>
   </dictionary>

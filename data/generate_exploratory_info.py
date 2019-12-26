@@ -7,16 +7,16 @@ import os
 
 from librosa.core import get_duration
 
-from data_build_register import extract_aup
+from data.data_build_register import extract_aup
 
 # collect all wav files
 cwd = os.getcwd()
-stations = os.listdir(cwd + '/data')
-stations = [s for s in stations if not s.startswith('.')]
+stations = filter(os.path.isdir, os.listdir(cwd))
+stations = [f for f in stations if not f.startswith('.')]
 
 audio_paths = []
 for station in stations:
-    data_path = f'{cwd}/data/{station}'
+    data_path = f'{cwd}/{station}'
     files = os.listdir(data_path)
     wav_names = [f for f in files if f.endswith('.wav')]
     wav_paths = [f'{data_path}/{f}' for f in wav_names]
@@ -29,14 +29,14 @@ print(f'their total play time amounts to {sum(lens) / 60 / 60:.2f} hours')
 # collect all aup files
 labeled_data = []
 for station in stations:
-    data_path = f'{cwd}/data/{station}'
+    data_path = f'{cwd}/{station}'
     files = os.listdir(data_path)
     audacity_projects = [f for f in files if f.endswith('.aup')]
     project_paths = [f'{data_path}/{aup}' for aup in audacity_projects]
     station_data = [extract_aup(i, data_path, station, verbose=0) for i in project_paths]
     labeled_data.extend(station_data)
 
-print(f'{len(labeled_data)} instances have labeles provided')
+print(f'{len(labeled_data)} instances have labels provided')
 
 # infer amount of detections
 labeled_lens = [get_duration(filename=f[1]) for f in labeled_data]

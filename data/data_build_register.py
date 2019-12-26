@@ -39,14 +39,14 @@ def extract_aup(aup_path, data_path, station, verbose=1):
 
 if __name__ == '__main__':
     cwd = os.getcwd()
-    stations = os.listdir(cwd + '/data')
-    stations = [s for s in stations if not s.startswith('.')]
+    stations = filter(os.path.isdir, os.listdir(cwd))
+    stations = [f for f in stations if not f.startswith('.')]
     print(f'found sub folders for station {stations}')
 
     data = []
     for station in stations:
         print(f'loading station {station}')
-        data_path = f'{cwd}/data/{station}'
+        data_path = f'{cwd}/{station}'
         files = os.listdir(data_path)
         audacity_projects = [f for f in files if f.endswith('.aup')]
         project_paths = [os.path.join(data_path, aup) for aup in audacity_projects]

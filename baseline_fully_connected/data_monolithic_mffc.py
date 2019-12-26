@@ -15,7 +15,7 @@ import pandas as pd
 from librosa.util import frame
 from tqdm import tqdm
 
-from utils import split
+from baseline_fully_connected.utils import split
 
 
 def mark_to_vec(marks_in_s, len_sequence):
@@ -65,6 +65,10 @@ def extract_aup(aup_path):
 
 
 def mfcc_vec(x):
+    """
+    vectorize mfcc calculation
+    """
+
     def mfcc(x):
         return librosa.feature.mfcc(x, sr=8000).flatten()
 
@@ -85,22 +89,21 @@ def transform(dataset):
 
     X = np.concatenate(X, axis=-1).T
     Y = np.concatenate(Y, axis=-1)
-    Y = (Y.sum(axis=0) / 8000)  # do not flatten for segmentation
+    Y = (Y.sum(axis=0) / 8000)
 
     return X, S, Y
 
 
 if __name__ == '__main__':
     save_subsets = True
-    cwd = os.getcwd()
-    stations = os.listdir(cwd + '/data')
-    stations = [s for s in stations if not s.startswith('.')]
+    root = os.path.abspath('../data/')
+    _, stations, _ = next(os.walk(root))
     print(f'found sub folders for station {stations}')
 
     data = []
     for station in stations:
         print(f'loading station {station}')
-        data_path = cwd + '/data/' + station
+        data_path = root + '/' + station
         files = os.listdir(data_path)
         audacity_projects = [f for f in files if f.endswith('.aup')]
         project_paths = [[os.path.join(data_path, aup)] for aup in audacity_projects]
@@ -109,11 +112,9 @@ if __name__ == '__main__':
         with mp.Pool(mp.cpu_count()) as p:
             station_data = p.starmap(extract_aup, project_paths)
 
-        data.extend(station_data)
-
-        if save_subsets == True:
+        if save_subsets:
             # safe subset of data
-            df = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
+            df = pd.DataFrame(station_data, columns=['station', 'audio', 'label_vec', 'detection'])
             print('split data')
             train, dev, test = split(df)
 
@@ -123,6 +124,8 @@ if __name__ == '__main__':
             test = transform(test)
             df = (train, dev, test)
             pickle.dump(df, open(f'data_monolithic_mfcc_{station}.pkl', 'wb'))
+
+        data.extend(station_data)
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])

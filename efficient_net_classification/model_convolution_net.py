@@ -1,5 +1,5 @@
 """
-Basic Convolutional Neural Net
+Convolutional Neural Net
 """
 
 import pickle
@@ -11,9 +11,9 @@ from efficientnet_pytorch import EfficientNet
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from augmentations import Spectrogram, Resize, ExpandDim
-from data_loader import AcousticSceneDataset
-from utils import split
+from baseline_fully_connected.utils import split
+from efficient_net_classification.augmentations import Spectrogram, Resize, ExpandDim
+from efficient_net_classification.data_loader import AcousticSceneDataset
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):
@@ -57,7 +57,7 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping):
 
 if __name__ == '__main__':
     print('read data set')
-    data_register = pickle.load(open('data_register.pkl', 'rb'))
+    data_register = pickle.load(open('../data/data_register.pkl', 'rb'))
     train, dev, test = split(data_register)
 
     transform = transforms.Compose([
