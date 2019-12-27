@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from baseline_fully_connected.utils import split
-from efficient_net_classification.augmentations import Resize, Spectrogram
+from convolution_net_classification.augmentations import Resize, Spectrogram
 
 
 class AcousticSceneDataset(Dataset):
@@ -48,6 +48,8 @@ class AcousticSceneDataset(Dataset):
         label_framed = librosa.util.frame(label_vec,
                                           frame_length=self.frame_length,
                                           hop_length=self.hop_length)
+
+        # todo append context
         return audio_framed, label_framed
 
     def load_in_frames(self, data_register):
@@ -60,7 +62,6 @@ class AcousticSceneDataset(Dataset):
         data_register.reset_index(inplace=True)
         with mp.Pool(mp.cpu_count()) as p:
             data_framed = p.map(self.read_from_register, range(len(self.data_register)))
-        # data_framed = [self.read_from_register(i) for i in range(len(self.data_register))]
 
         audio, label = list(zip(*data_framed))
         print('concatenate audio')
@@ -68,9 +69,10 @@ class AcousticSceneDataset(Dataset):
         print('concatenate labels')
         labels = np.concatenate(label, axis=-1).T
         print('perform one hot encoding')
-        station = np.array(pd.get_dummies(data_register.station))
+        # station = np.array(pd.get_dummies(data_register.station))
+        # station = np.repeat(station, (len(labels), 1))
 
-        return audio, labels, station
+        return audio, labels
 
     def label_to_vec(self, label_in_seconds, len_sequence):
         """
@@ -91,19 +93,17 @@ class AcousticSceneDataset(Dataset):
     def __getitem__(self, item):
         sample = self.audio[item]
         target = self.label[item]
+        context = self.station[item]
 
         # todo implement mixup
+
+        target = np.array(target.sum() / self.frame_length).astype('float32')
+        target = torch.from_numpy(target).long()
 
         if self.transform:
             sample = self.transform(sample)
 
-        target = np.array(target.sum() / self.frame_length).astype('float32')
-        target = np.expand_dims(target, 0)
-
-        sample = torch.from_numpy(sample)
-        target = torch.from_numpy(target).float()
-
-        return sample, target
+        return sample, context, target
 
     def __len__(self):
         return len(self.audio)
@@ -118,8 +118,9 @@ if __name__ == '__main__':
     # optionally condition on station
     # df = df[df.station['VHB']]
     print('split data')
+    df = df[:10]
     train, dev, test = split(df)
     print('load train set')
     composed = transforms.Compose([Spectrogram(nperseg=1024, noverlap=768),
                                    Resize(224, 224)])
-    train = AcousticSceneDataset(train)
+    train = AcousticSceneDataset(train, transform=composed)

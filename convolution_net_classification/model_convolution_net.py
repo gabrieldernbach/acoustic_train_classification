@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from baseline_fully_connected.utils import split
-from efficient_net_classification.augmentations import Spectrogram, Resize, ExpandDim
-from efficient_net_classification.data_loader import AcousticSceneDataset
+from convolution_net_classification.augmentations import Spectrogram, Resize, ExpandDim
+from convolution_net_classification.data_loader import AcousticSceneDataset
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):
