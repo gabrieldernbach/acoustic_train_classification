@@ -37,8 +37,7 @@ class Trainer:
     def _train_step(self, train_loader):
         self.training_loss, self.training_accuracy = 0.0, 0.0
         self.model.train()
-        # for i, (inputs, labels, context) in enumerate(train_loader):
-        for i, (inputs, labels) in enumerate(train_loader):
+        for i, (inputs, context, labels) in enumerate(train_loader):
             self.optimizer.zero_grad()
             # outputs = self.model(inputs, context)
             outputs = self.model(inputs)
@@ -57,8 +56,8 @@ class Trainer:
         self.validation_loss, self.validation_accuracy = 0.0, 0.0
         self.model.eval()
         with torch.no_grad():
-            # for i, (inputs, labels, context) in enumerate(val_loader):
-            for i, (inputs, labels) in enumerate(val_loader):
+            for i, (inputs, context, labels) in enumerate(val_loader):
+                # for i, (inputs, labels) in enumerate(val_loader):
                 # outputs = self.model(inputs, context)
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)

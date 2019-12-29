@@ -12,7 +12,6 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from baseline_fully_connected.utils import split
 from convolution_net_classification.augmentations import Resize, Spectrogram
 
 
@@ -25,12 +24,13 @@ class AcousticSceneDataset(Dataset):
                  frame_length=48000,
                  hop_length=12000):
         self.data_register = data_register
+        self.data_register['station'] = self.data_register['station'].factorize()[0]
         self.frame_length = frame_length
         self.transform = transform
         self.hop_length = hop_length
         self.sr = sr
 
-        self.audio, self.label, self.station = self.load_in_frames(data_register)
+        self.audio, self.context, self.label = self.load_in_frames(data_register)
 
     def read_from_register(self, idx):
         print(f'reading entry {idx}')
@@ -49,8 +49,11 @@ class AcousticSceneDataset(Dataset):
                                           frame_length=self.frame_length,
                                           hop_length=self.hop_length)
 
-        # todo append context
-        return audio_framed, label_framed
+        # load an frame context identifier
+        context = self.data_register.station[idx]
+        context_framed = np.repeat(context, label_framed.shape[1])
+
+        return audio_framed, context_framed, label_framed
 
     def load_in_frames(self, data_register):
         """
@@ -62,17 +65,17 @@ class AcousticSceneDataset(Dataset):
         data_register.reset_index(inplace=True)
         with mp.Pool(mp.cpu_count()) as p:
             data_framed = p.map(self.read_from_register, range(len(self.data_register)))
+        # data_framed = [self.read_from_register(i) for i in range(len(self.data_register))]
 
-        audio, label = list(zip(*data_framed))
+        audio, context, label = list(zip(*data_framed))
         print('concatenate audio')
         audio = np.concatenate(audio, axis=-1).T
+        print('concatenate context')
+        context = np.concatenate(context, axis=-1).T
         print('concatenate labels')
         labels = np.concatenate(label, axis=-1).T
-        print('perform one hot encoding')
-        # station = np.array(pd.get_dummies(data_register.station))
-        # station = np.repeat(station, (len(labels), 1))
 
-        return audio, labels
+        return audio, context, labels
 
     def label_to_vec(self, label_in_seconds, len_sequence):
         """
@@ -90,15 +93,17 @@ class AcousticSceneDataset(Dataset):
 
         return label_vec
 
-    def __getitem__(self, item):
-        sample = self.audio[item]
-        target = self.label[item]
-        context = self.station[item]
+    def __getitem__(self, idx):
+        sample = self.audio[idx]
+        target = self.label[idx]
+        context = self.context[idx]
 
-        # todo implement mixup
-
+        # convert labels
         target = np.array(target.sum() / self.frame_length).astype('float32')
         target = torch.from_numpy(target).long()
+        context = torch.tensor(context).long()
+
+        # todo implement mixup
 
         if self.transform:
             sample = self.transform(sample)
@@ -112,15 +117,29 @@ class AcousticSceneDataset(Dataset):
         return f'{self.__class__.__name__}'
 
 
+def split(data, a=0.6, b=0.8):
+    """
+    Create a random train, dev, test split of a pandas data frame
+    """
+    a, b = int(a * len(data)), int(b * len(data))
+    data_shuffled = data.sample(frac=1).reset_index(drop=True)
+    train, validation, test = np.split(data_shuffled, [a, b])
+    validation.reset_index(inplace=True, drop=True)
+    test.reset_index(inplace=True, drop=True)
+    return train, validation, test
+
+
 if __name__ == '__main__':
     print('read register')
     df = pd.read_pickle('../data/data_register.pkl')
     # optionally condition on station
     # df = df[df.station['VHB']]
     print('split data')
-    df = df[:10]
+    df = df[:3]
     train, dev, test = split(df)
     print('load train set')
     composed = transforms.Compose([Spectrogram(nperseg=1024, noverlap=768),
                                    Resize(224, 224)])
     train = AcousticSceneDataset(train, transform=composed)
+    print(train[1])
+    print('test success')
