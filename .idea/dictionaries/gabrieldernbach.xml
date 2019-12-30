@@ -3,6 +3,7 @@
     <words>
       <w>bilinear</w>
       <w>convolutional</w>
+      <w>cuda</w>
       <w>datapath</w>
       <w>devloader</w>
       <w>gbrt</w>

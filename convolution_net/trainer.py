@@ -4,8 +4,9 @@ import torch
 
 class Trainer:
 
-    def __init__(self, model, criterion, optimizer, epochs, callback, early_stop_patience, early_stop_verbose):
+    def __init__(self, model, device, criterion, optimizer, epochs, callback, early_stop_patience, early_stop_verbose):
         self.model = model
+        self.device = device
         self.criterion = criterion
         self.optimizer = optimizer
         self.epochs = epochs
@@ -38,11 +39,13 @@ class Trainer:
         self.training_loss, self.training_accuracy = 0.0, 0.0
         self.model.train()
         for i, (inputs, context, labels) in enumerate(train_loader):
+            inputs, context, labels = inputs.to(self.device), context.to(self.device), labels.to(self.device)
             self.optimizer.zero_grad()
             # outputs = self.model(inputs, context)
             outputs = self.model(inputs)
             loss = self.criterion(outputs, labels)
             accuracy = self._accuracy(outputs, labels)
+            print(f'batch accuracy {accuracy}')
             self.training_loss += loss.item()
             self.training_accuracy += 1 / (i + 1) * (accuracy - self.training_accuracy)
             loss.backward()
@@ -50,18 +53,20 @@ class Trainer:
 
             if (i + 1) % 10 == 0:
                 print('[epoch %d, batch %5d] loss: %.9f' %
-                      (self.current_epoch + 1, i + 1, self.training_loss / 2000))
+                      (self.current_epoch + 1, i + 1, loss / len(inputs)))
 
     def _validation_step(self, val_loader):
         self.validation_loss, self.validation_accuracy = 0.0, 0.0
         self.model.eval()
         with torch.no_grad():
             for i, (inputs, context, labels) in enumerate(val_loader):
+                inputs, context, labels = inputs.to(self.device), context.to(self.device), labels.to(self.device)
                 # for i, (inputs, labels) in enumerate(val_loader):
                 # outputs = self.model(inputs, context)
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)
                 accuracy = self._accuracy(outputs, labels)
+                print(f'batch accuracy {accuracy}')
                 self.validation_loss += loss.item()
                 self.validation_accuracy += 1 / (i + 1) * (accuracy - self.validation_accuracy)
 

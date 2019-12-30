@@ -1,0 +1,3 @@
+/venv/
+/convolution_net/checkpoint.pt
+*.pkl

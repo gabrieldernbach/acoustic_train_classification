@@ -5,6 +5,7 @@ can be readily called inside the training loader via trainsforms = [ ... ]
 
 import numpy as np
 from librosa.effects import pitch_shift, percussive
+from librosa.feature import melspectrogram
 from scipy.signal import spectrogram
 from skimage.transform import resize
 
@@ -27,6 +28,24 @@ class PitchShift(object):
                              self.bins_per_octave,
                              self.res_type)
         return sample
+
+
+class MelSpectrogram(object):
+
+    def __init__(self, sr=48000, n_fft=2048, hop_length=512):
+        self.sr = sr
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+
+    def __call__(self, sample):
+        sample = np.ascontiguousarray(sample)
+        spec = melspectrogram(y=sample,
+                              sr=self.sr,
+                              n_fft=self.n_fft,
+                              hop_length=self.hop_length)
+        logspec = np.log(spec + 1e-9)
+        logspec -= np.mean(logspec)
+        return logspec
 
 
 class AdjustAmplitude(object):

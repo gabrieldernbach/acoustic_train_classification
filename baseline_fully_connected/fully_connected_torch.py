@@ -34,7 +34,7 @@ class ONN(nn.Module):
         return x
 
 
-class dONN(nn.Module):
+class DropNN(nn.Module):
     """
     Neural Network with drop out regularization
     """
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     X_dev = X_dev.reshape(len(X_dev), 1, -1)
     X_test = X_test.reshape(len(X_test), 1, -1)
 
-    net = dONN()
+    net = ONN()
     net(X_train)
     train_model(model=net,
                 criterion=nn.BCELoss(),

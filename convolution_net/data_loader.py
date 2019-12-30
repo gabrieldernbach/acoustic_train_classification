@@ -4,15 +4,16 @@ The dataset must be specified by a register locating the files. (see data_build_
 """
 
 import multiprocessing as mp
+import os
+import pickle
 
 import librosa
 import numpy as np
 import pandas as pd
 import torch
+from augmentations import Resize, Spectrogram
 from torch.utils.data import Dataset
 from torchvision import transforms
-
-from convolution_net_classification.augmentations import Resize, Spectrogram
 
 
 class AcousticSceneDataset(Dataset):
@@ -30,7 +31,16 @@ class AcousticSceneDataset(Dataset):
         self.hop_length = hop_length
         self.sr = sr
 
-        self.audio, self.context, self.label = self.load_in_frames(data_register)
+        checkpoint_path = '../data/subsampeled.pkl'
+        if os.path.exists(checkpoint_path):
+            print('reading resampeled data from previous checkpoint')
+            self.audio, self.context, self.label = pickle.load(open(checkpoint_path, 'rb'))
+        else:
+            print('loading and resampling from dataset')
+            self.audio, self.context, self.label = self.load_in_frames(data_register)
+            print(f'saving resampeled files to {checkpoint_path}')
+            pickle.dump((self.audio, self.context, self.label),
+                        open(checkpoint_path, 'wb'))
 
     def read_from_register(self, idx):
         print(f'reading entry {idx}')
@@ -48,7 +58,6 @@ class AcousticSceneDataset(Dataset):
         label_framed = librosa.util.frame(label_vec,
                                           frame_length=self.frame_length,
                                           hop_length=self.hop_length)
-
         # load an frame context identifier
         context = self.data_register.station[idx]
         context_framed = np.repeat(context, label_framed.shape[1])
@@ -61,9 +70,9 @@ class AcousticSceneDataset(Dataset):
         applies framing to audio and labels,
         stations are one hot encoded alphabetically
         """
-        print('starting pool')
-        data_register.reset_index(inplace=True)
-        with mp.Pool(mp.cpu_count()) as p:
+        print(f'starting pool with {8} workers')
+        self.data_register.reset_index(inplace=True)
+        with mp.Pool(8) as p:
             data_framed = p.map(self.read_from_register, range(len(self.data_register)))
         # data_framed = [self.read_from_register(i) for i in range(len(self.data_register))]
 
@@ -122,11 +131,28 @@ def split(data, a=0.6, b=0.8):
     Create a random train, dev, test split of a pandas data frame
     """
     a, b = int(a * len(data)), int(b * len(data))
-    data_shuffled = data.sample(frac=1).reset_index(drop=True)
+    data_shuffled = data.sample(frac=1, random_state=1).reset_index(drop=True)
     train, validation, test = np.split(data_shuffled, [a, b])
     validation.reset_index(inplace=True, drop=True)
     test.reset_index(inplace=True, drop=True)
     return train, validation, test
+
+
+def balancing_sample_weights(data_loader):
+    """
+    returns for each sample in data loader the corresponding weight to balance the classes.
+    The weight is the reciprocal of the relative class frequency.
+    """
+    labels = []
+    for i, (sample, context, label) in enumerate(data_loader):
+        labels.append(label.numpy())
+    labels = np.concatenate(labels)
+    n_samples = len(labels)
+    labels = (labels != 0) * 1
+    ratio = np.bincount(labels)
+    weights = 1. / ratio
+    sample_weights = weights[labels]
+    return torch.from_numpy(sample_weights), n_samples
 
 
 if __name__ == '__main__':
