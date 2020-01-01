@@ -10,7 +10,20 @@ By default data is assumed to live in:
 import os
 import xml.etree.ElementTree as ElementTree
 
+import numpy as np
 import pandas as pd
+
+
+def split(data, a=0.6, b=0.8):
+    """
+    Create a random train, dev, test split of a pandas data frame
+    """
+    a, b = int(a * len(data)), int(b * len(data))
+    data_shuffled = data.sample(frac=1, random_state=1).reset_index(drop=True)
+    train, validation, test = np.split(data_shuffled, [a, b])
+    validation.reset_index(inplace=True, drop=True)
+    test.reset_index(inplace=True, drop=True)
+    return train, validation, test
 
 
 def extract_aup(aup_path, data_path, station, verbose=1):
@@ -61,3 +74,8 @@ if __name__ == '__main__':
                                        'label', 'detection'])
     print('safe file to "data_register.pkl"')
     data.to_pickle('data_register.pkl')
+
+    train, dev, test = split(data)
+    train.to_pickle('data_register_train.pkl')
+    dev.to_pickle('data_register_dev.pkl')
+    test.to_pickle('data_register_test.pkl')

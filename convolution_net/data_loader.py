@@ -4,8 +4,6 @@ The dataset must be specified by a register locating the files. (see data_build_
 """
 
 import multiprocessing as mp
-import os
-import pickle
 
 import librosa
 import numpy as np
@@ -31,16 +29,17 @@ class AcousticSceneDataset(Dataset):
         self.hop_length = hop_length
         self.sr = sr
 
-        checkpoint_path = '../data/subsampeled.pkl'
-        if os.path.exists(checkpoint_path):
-            print('reading resampeled data from previous checkpoint')
-            self.audio, self.context, self.label = pickle.load(open(checkpoint_path, 'rb'))
-        else:
-            print('loading and resampling from dataset')
-            self.audio, self.context, self.label = self.load_in_frames(data_register)
-            print(f'saving resampeled files to {checkpoint_path}')
-            pickle.dump((self.audio, self.context, self.label),
-                        open(checkpoint_path, 'wb'))
+        # checkpoint_path = '../data/subsampeled.pkl'
+        # if os.path.exists(checkpoint_path):
+        #     print('reading resampeled data from previous checkpoint')
+        #     self.audio, self.context, self.label = pickle.load(open(checkpoint_path, 'rb'))
+        # else:
+        #     print('extracting and resampling from raw dataset')
+        #     self.audio, self.context, self.label = self.load_in_frames(data_register)
+        #     print(f'saving resampled files to {checkpoint_path}')
+        #     pickle.dump((self.audio, self.context, self.label),
+        #                 open(checkpoint_path, 'wb'), protocol=4)
+        self.audio, self.context, self.label = self.load_in_frames(data_register)
 
     def read_from_register(self, idx):
         print(f'reading entry {idx}')

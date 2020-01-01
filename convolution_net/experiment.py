@@ -52,13 +52,10 @@ def main(batch_size, epochs, learning_rate):
         transforms.ToTensor(),
     ])
 
-    train_loader = DataLoader(AcousticSceneDataset(train),
-                              batch_size=batch_size,
-                              num_workers=8,
-                              pin_memory=True)
-
+    train_loader = DataLoader(AcousticSceneDataset(train), batch_size=batch_size)
     weights, n_samples = balancing_sample_weights(train_loader)
     train_sampler = WeightedRandomSampler(weights, len(weights))
+
     train_loader = DataLoader(AcousticSceneDataset(train, transform=transform),
                               sampler=train_sampler,
                               batch_size=batch_size,
