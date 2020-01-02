@@ -76,6 +76,10 @@ if __name__ == '__main__':
     data.to_pickle('data_register.pkl')
 
     train, dev, test = split(data)
+
     train.to_pickle('data_register_train.pkl')
+    print(f'train data ratio of well / defective trains \n{train.detection.value_counts(normalize=True).values}')
     dev.to_pickle('data_register_dev.pkl')
+    print(f'dev data ratio of well / defective trains \n{dev.detection.value_counts(normalize=True).values}')
     test.to_pickle('data_register_test.pkl')
+    print(f'test data ratio of well / defective trains \n{test.detection.value_counts(normalize=True).values}')
