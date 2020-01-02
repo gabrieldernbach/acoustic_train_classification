@@ -1,6 +1,5 @@
 """
-Create a monolithic mfcc dataset to reproduce legacy code such
-as the models in models_basic_classifier.py and models_basic_regressor.py
+Save dataset under mel spectrogram transformation for convolution
 """
 
 import multiprocessing as mp
@@ -12,8 +11,9 @@ import librosa
 import numpy as np
 import pandas as pd
 from librosa.util import frame
+from tqdm import tqdm
 
-from convolution_net.data_loader import split
+from baseline_fully_connected.utils import split
 
 
 def mark_to_vec(marks_in_s, len_sequence):
@@ -84,10 +84,10 @@ def transform(dataset):
     Y = [frame(y, frame_length=8000, hop_length=2000) for y in Y]
 
     X = np.concatenate(X, axis=-1).T
+    X = [librosa.feature.melspectrogram(x, sr=8000, n_fft=512, hop_length=128) for x in tqdm(X)]
+    X = np.stack(X)
     Y = np.concatenate(Y, axis=-1)
     Y = (Y.sum(axis=0) / 8000)
-
-    librosa.feature.melspectrogram()
 
     return X, S, Y
 
@@ -121,17 +121,17 @@ if __name__ == '__main__':
     dev = transform(dev)
     test = transform(test)
 
-    np.savez('resampled_train.npz',
+    np.savez('mel_train.npz',
              audio=train[0],
              station=train[1],
              label=train[2])
 
-    np.savez('resampled_dev.npz',
+    np.savez('mel_dev.npz',
              audio=dev[0],
              station=dev[1],
              label=dev[2])
 
-    np.savez('resampled_test.npz',
+    np.savez('mel_test.npz',
              audio=test[0],
              station=test[1],
              label=test[2])
