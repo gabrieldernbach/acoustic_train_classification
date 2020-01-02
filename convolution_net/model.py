@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.models as models
 from efficientnet_pytorch import EfficientNet
 
 """
@@ -20,12 +19,6 @@ eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 2), nn.Softma
 squeezenet = torch.hub.load('pytorch/vision:v0.4.2', 'squeezenet1_0', pretrained=True)
 first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
 squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 2), nn.Softmax(dim=1))
-
-"""
-classical resnet18 and 50
-"""
-resnet18 = models.resnet18()
-resnet50 = models.resnet50()
 
 
 class ConvBlock(nn.Module):
@@ -79,7 +72,7 @@ class Flatten(nn.Module):
         return input.view(input.size(0), -1)
 
 
-ResNet = nn.Sequential(  # beginning shape 224
+ResNet224 = nn.Sequential(  # beginning shape 224
     ConvBlock(1, 64, stride=2),  # remaining shape 122
     ResBlock(64, 64),
     ResBlock(64, 64),
@@ -109,7 +102,31 @@ ResNet = nn.Sequential(  # beginning shape 224
     Flatten()
 )
 
-VggNet = nn.Sequential(  # input shape 224
+ResNet128 = nn.Sequential(  # input shape 128, 63
+    ConvBlock(1, 32, stride=2),  # remaining shape 64, 32
+    ResBlock(32, 32),
+    ResBlock(32, 32),
+    ResBlock(32, 64, stride=2),  # 32, 16
+    ResBlock(64, 64),
+    ResBlock(64, 64),
+    ResBlock(64, 128, stride=2),  # 16, 8
+    ResBlock(128, 128),
+    ResBlock(128, 128),
+    ResBlock(128, 256, stride=2),  # 8, 4
+    ResBlock(256, 256),
+    ResBlock(256, 256),
+    ResBlock(256, 512, stride=2),  # 4, 2
+    ResBlock(512, 512),
+    ResBlock(512, 512),
+    ResBlock(512, 512, stride=2),  # 4, 2
+    ResBlock(512, 512, stride=2),  # 2, 1
+    ResBlock(512, 512, stride=2),  # 1, 1
+    ResBlock(512, 256),
+    ConvBlock(256, 2),
+    Flatten()
+)
+
+VggNet224 = nn.Sequential(  # input shape 224
     ConvBlock(1, 32, stride=2),  # remaining shape 122
     ConvBlock(32, 64, stride=2),  # 61
     ConvBlock(64, 128, stride=2),  # 31

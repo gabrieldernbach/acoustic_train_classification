@@ -29,7 +29,7 @@ class MelDataset(Dataset):
 
     def __getitem__(self, idx):
         inputs = self.inputs[idx]
-        context = self.context[idx]
+        context = self.context[0]  # todo: need one hot encoding first!
         labels = self.labels[idx]
 
         # convert labels
@@ -38,6 +38,8 @@ class MelDataset(Dataset):
         # context = torch.tensor(context).long()
         if self.transform:
             inputs = self.transform(inputs)
+
+        inputs = inputs.unsqueeze(0)
 
         return inputs, context, labels
 

@@ -20,7 +20,7 @@ from torchvision import transforms
 
 from baseline_fully_connected.utils import split
 from convolution_net.data_augmentations import Spectrogram, Resize, ExpandDim
-from convolution_net.data_loader import RawDataset
+from convolution_net.data_set_custom import RawDataset
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):

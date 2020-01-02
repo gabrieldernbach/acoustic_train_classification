@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from convolution_net.data_augmentations import Resize, MelSpectrogram
-from convolution_net.data_loader import RawDataset, split
+from convolution_net.data_set_custom import RawDataset, split
 
 data_register = pickle.load(open('../data/data_register.pkl', 'rb'))
 data_register = data_register.sample(n=6).reset_index(drop=True)

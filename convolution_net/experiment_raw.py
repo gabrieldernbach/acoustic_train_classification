@@ -1,23 +1,17 @@
-#!/usr/bin/env python3
-# $ -l cuda=1
-# $ -l mem_free=40G
-# $ -q all.q
-# $ -cwd
-# $ -V
-
 import pickle
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from augmentations import Resize, MelSpectrogram
-from data_loader import AcousticSceneDataset, split, balancing_sample_weights
-from model import ResNet
 from sacred import Experiment
 from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import transforms
-from trainer import Trainer
+
+from convolution_net.data_augmentations import Resize, MelSpectrogram
+from convolution_net.data_set_custom import RawDataset, split, balancing_sample_weights
+from convolution_net.model import ResNet224
+from convolution_net.trainer import Trainer
 
 ex = Experiment("OnMel")
 path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
@@ -31,7 +25,8 @@ def cfg():
     learning_rate = 0.1
 
 
-def logger(trainer):
+@ex.capture
+def logger(trainer, _run):
     ex.log_scalar('training_loss', trainer.training_loss, step=trainer.current_epoch)
     ex.log_scalar('training_accuracy', trainer.training_accuracy, step=trainer.current_epoch)
     ex.log_scalar('validation_loss', trainer.validation_loss, step=trainer.current_epoch)
@@ -52,27 +47,27 @@ def main(batch_size, epochs, learning_rate):
         transforms.ToTensor(),
     ])
 
-    train_loader = DataLoader(AcousticSceneDataset(train), batch_size=batch_size)
+    train_loader = DataLoader(RawDataset(train), batch_size=batch_size)
     weights, n_samples = balancing_sample_weights(train_loader)
     train_sampler = WeightedRandomSampler(weights, len(weights))
 
-    train_loader = DataLoader(AcousticSceneDataset(train, transform=transform),
+    train_loader = DataLoader(RawDataset(train, transform=transform),
                               sampler=train_sampler,
                               batch_size=batch_size,
                               num_workers=8,
                               pin_memory=True)
 
-    validation_loader = DataLoader(AcousticSceneDataset(validation, transform=transform),
+    validation_loader = DataLoader(RawDataset(validation, transform=transform),
                                    batch_size=batch_size,
                                    num_workers=8,
                                    pin_memory=True)
-    test_loader = DataLoader(AcousticSceneDataset(test, transform=transform),
+    test_loader = DataLoader(RawDataset(test, transform=transform),
                              batch_size=batch_size,
                              num_workers=8,
                              pin_memory=True)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = ResNet.to(device)
+    net = ResNet224.to(device)
 
     print('start training')
     trainer = Trainer(model=net,
