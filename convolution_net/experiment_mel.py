@@ -30,27 +30,24 @@ def logger(trainer):
 
 @ex.automain
 def main(learning_rate, epochs, _run):
-    train_path = 'mel_train.npz'
-    validation_path = 'mel_dev.npz'
-    test_path = 'mel_test.npz'
-
+    train_path, validation_path, test_path = 'mel_train.npz', 'mel_dev.npz', 'mel_test.npz'
     train_loader = DataLoader(MelDataset(train_path), batch_size=20)
     validation_loader = DataLoader(MelDataset(validation_path), batch_size=20)
     test_loader = DataLoader(MelDataset(test_path), batch_size=20)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = ResNet128.to(device)
+    model = ResNet128.to(device)
 
-    trainer = Trainer(model=net,
+    trainer = Trainer(model=model,
                       device=device,
                       criterion=nn.CrossEntropyLoss(),
-                      optimizer=optim.Adam(net.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
+                      optimizer=optim.AdamW(model.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
                       epochs=epochs,
                       callback=logger,
                       early_stop_patience=20,
                       early_stop_verbose=True,
                       )
 
-    trainer.fit(train_loader, validation_loader)
+    trainer.fit(test_loader, validation_loader)
 
     _run.result = trainer.validation_accuracy

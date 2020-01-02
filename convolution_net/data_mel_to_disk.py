@@ -125,7 +125,7 @@ if __name__ == '__main__':
              station=train[1],
              label=train[2])
 
-    np.savez('mel_dev.npz',
+    np.savez('mel_validation.npz',
              audio=dev[0],
              station=dev[1],
              label=dev[2])

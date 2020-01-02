@@ -44,7 +44,7 @@ class Trainer:
             outputs = self.model(inputs)
             loss = self.criterion(outputs, labels)
             accuracy = self._accuracy(outputs, labels)
-            print(f'batch accuracy {accuracy}')
+            # print(f'batch accuracy {accuracy}')
             self.training_loss += loss.item()
             self.training_accuracy += 1 / (i + 1) * (accuracy - self.training_accuracy)
             loss.backward()
