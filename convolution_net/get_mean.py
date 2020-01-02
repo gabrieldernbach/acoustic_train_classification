@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from convolution_net.augmentations import Resize, MelSpectrogram
+from convolution_net.data_augmentations import Resize, MelSpectrogram
 from convolution_net.data_loader import AcousticSceneDataset, split
 
 data_register = pickle.load(open('../data/data_register.pkl', 'rb'))

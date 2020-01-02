@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from baseline_fully_connected.utils import split
-from convolution_net.augmentations import Spectrogram, Resize, ExpandDim
+from convolution_net.data_augmentations import Spectrogram, Resize, ExpandDim
 from convolution_net.data_loader import AcousticSceneDataset
 
 
