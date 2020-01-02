@@ -4,17 +4,51 @@ The dataset must be specified by a register locating the files. (see data_build_
 """
 
 import multiprocessing as mp
+import os
 
 import librosa
 import numpy as np
-import pandas as pd
 import torch
-from augmentations import Resize, Spectrogram
 from torch.utils.data import Dataset
-from torchvision import transforms
 
 
-class AcousticSceneDataset(Dataset):
+class MelDataset(Dataset):
+
+    def __init__(self, datapath, transform=None):
+        self.datapath = datapath
+        self.transform = transform
+        if os.path.exists(datapath):
+            data = np.load(datapath, allow_pickle=True)
+        else:
+            print('file not found')
+            print('mel dataset must be created by running data_mel_to_disk.py')
+
+        self.inputs = data['audio']
+        self.context = data['station']
+        self.labels = data['label']
+
+    def __getitem__(self, idx):
+        inputs = self.inputs[idx]
+        context = self.context[idx]
+        labels = self.labels[idx]
+
+        # convert labels
+        inputs = torch.from_numpy(inputs).float()
+        labels = torch.tensor(labels).long()
+        # context = torch.tensor(context).long()
+        if self.transform:
+            inputs = self.transform(inputs)
+
+        return inputs, context, labels
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}'
+
+
+class RawDataset(Dataset):
 
     def __init__(self,
                  data_register,
@@ -127,7 +161,7 @@ class AcousticSceneDataset(Dataset):
 
 def split(data, a=0.6, b=0.8):
     """
-    Create a random train, dev, test split of a pandas data frame
+    Create a random titemrain, dev, test split of a pandas data frame
     """
     a, b = int(a * len(data)), int(b * len(data))
     data_shuffled = data.sample(frac=1, random_state=1).reset_index(drop=True)
@@ -155,16 +189,20 @@ def balancing_sample_weights(data_loader):
 
 
 if __name__ == '__main__':
-    print('read register')
-    df = pd.read_pickle('../data/data_register.pkl')
-    # optionally condition on station
-    # df = df[df.station['VHB']]
-    print('split data')
-    df = df[:3]
-    train, dev, test = split(df)
-    print('load train set')
-    composed = transforms.Compose([Spectrogram(nperseg=1024, noverlap=768),
-                                   Resize(224, 224)])
-    train = AcousticSceneDataset(train, transform=composed)
-    print(train[1])
-    print('test success')
+    # test RawDataset
+    # print('read register')
+    # df = pd.read_pickle('../data/data_register.pkl')
+    # print('split data')
+    # df = df[:3]
+    # train, dev, test = split(df)
+    # print('load train set')
+    # composed = transforms.Compose([Spectrogram(nperseg=1024, noverlap=768),
+    #                                Resize(224, 224)])
+    # train = RawDataset(train, transform=composed)
+    # print(train[1])
+    # print('test success')
+
+    # test MelDataset
+    dev_path = 'mel_dev.npz'
+    devset = MelDataset(dev_path)
+    print(devset[1])

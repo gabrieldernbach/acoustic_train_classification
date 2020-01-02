@@ -62,15 +62,14 @@ def extract_aup(aup_path):
     return station, audio, label_vec, detection
 
 
-def stmt_vec(x):
+def stmt(x):
     """
-    vectorize mel spectrogram calculation
+    returns the normalized log short term mel spectrogram transformation of signal vector x
     """
-
-    def mt(x):
-        return librosa.feature.melspectrogram(x, sr=8000, n_fft=2048, hop_length=512)
-
-    return np.apply_along_axis(mt, 0, x)
+    x = librosa.feature.melspectrogram(x, sr=8000, n_fft=512, hop_length=128)
+    x = np.log(x) + 1e-12
+    x -= np.mean(x)
+    return x
 
 
 def transform(dataset):

@@ -20,7 +20,7 @@ from torchvision import transforms
 
 from baseline_fully_connected.utils import split
 from convolution_net.data_augmentations import Spectrogram, Resize, ExpandDim
-from convolution_net.data_loader import AcousticSceneDataset
+from convolution_net.data_loader import RawDataset
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):
@@ -73,20 +73,20 @@ if __name__ == '__main__':
         ExpandDim()
     ])
 
-    train_loader = DataLoader(AcousticSceneDataset(train),
+    train_loader = DataLoader(RawDataset(train),
                               batch_size=50,
                               num_workers=12,
                               pin_memory=True)
 
-    train_loader = DataLoader(AcousticSceneDataset(train),
+    train_loader = DataLoader(RawDataset(train),
                               batch_size=50,
                               num_workers=12,
                               pin_memory=True)
-    dev_loader = DataLoader(AcousticSceneDataset(dev, transform=transform),
+    dev_loader = DataLoader(RawDataset(dev, transform=transform),
                             batch_size=50,
                             num_workers=12,
                             pin_memory=True)
-    test_loader = DataLoader(AcousticSceneDataset(test, transform=transform),
+    test_loader = DataLoader(RawDataset(test, transform=transform),
                              batch_size=50,
                              num_workers=12,
                              pin_memory=True)
