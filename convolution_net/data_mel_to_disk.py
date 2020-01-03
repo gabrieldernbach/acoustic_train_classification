@@ -13,7 +13,7 @@ import pandas as pd
 from librosa.util import frame
 from tqdm import tqdm
 
-from baseline_fully_connected.utils import split
+from data_set_custom import split
 
 
 def mark_to_vec(marks_in_s, len_sequence):

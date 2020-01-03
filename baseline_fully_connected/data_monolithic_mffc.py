@@ -1,6 +1,5 @@
 """
-Create a monolithic mfcc dataset to reproduce legacy code such
-as the models in models_basic_classifier.py and models_basic_regressor.py
+Create a monolithic mfcc dataset for fully connected light weight training
 """
 
 import multiprocessing as mp
@@ -15,7 +14,7 @@ import pandas as pd
 from librosa.util import frame
 from tqdm import tqdm
 
-from baseline_fully_connected.utils import split
+from utils import split
 
 
 def mark_to_vec(marks_in_s, len_sequence):
@@ -28,6 +27,7 @@ def mark_to_vec(marks_in_s, len_sequence):
         start = round(float(mark[0]) * 8000)
         end = round(float(mark[1]) * 8000)
         mark_in_samp.append([start, end])
+
 
     label_vec = np.zeros(len_sequence)
     for mark in mark_in_samp:
@@ -60,8 +60,9 @@ def extract_aup(aup_path):
         end = element.attrib['t1']
         marks_in_s.append((start, end))
     label_vec, detection = mark_to_vec(marks_in_s, audio_len)
+    station_vec = np.repeat(station_id, audio_len)
 
-    return station, audio, label_vec, detection
+    return station_vec, audio, label_vec, detection
 
 
 def mfcc_vec(x):
@@ -77,17 +78,18 @@ def mfcc_vec(x):
 
 def transform(dataset):
     X = dataset.audio
-    S = dataset.station
+    S = data.station
     Y = dataset.label_vec
 
     print('starting transform')
     X = [frame(x, frame_length=8000, hop_length=1000) for x in X]
     Y = [frame(y, frame_length=8000, hop_length=1000) for y in Y]
+    S = [frame(s, frame_length=8000, hop_length=1000) for s in S]
 
     print('start mfcc')
     X = [mfcc_vec(x) for x in tqdm(X)]
-
     X = np.concatenate(X, axis=-1).T
+    S = np.concatenate(S, axis=-1)[:, 0]  # only take first element of station
     Y = np.concatenate(Y, axis=-1)
     Y = (Y.sum(axis=0) / 8000)
 
@@ -95,13 +97,14 @@ def transform(dataset):
 
 
 if __name__ == '__main__':
-    save_subsets = True
+    save_subsets = False
     root = os.path.abspath('../data/')
     _, stations, _ = next(os.walk(root))
+    stations = [f for f in stations if not f.startswith('.')]
     print(f'found sub folders for station {stations}')
 
     data = []
-    for station in stations:
+    for station_id, station in enumerate(stations):
         print(f'loading station {station}')
         data_path = root + '/' + station
         files = os.listdir(data_path)

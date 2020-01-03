@@ -4,7 +4,6 @@ The dataset must be specified by a register locating the files. (see data_build_
 """
 
 import multiprocessing as mp
-import os
 
 import librosa
 import numpy as np
@@ -17,12 +16,8 @@ class MelDataset(Dataset):
     def __init__(self, datapath, transform=None):
         self.datapath = datapath
         self.transform = transform
-        if os.path.exists(datapath):
-            data = np.load(datapath, allow_pickle=True)
-        else:
-            print('file not found')
-            print('mel dataset must be created by running data_mel_to_disk.py')
 
+        data = np.load(datapath, allow_pickle=True)
         self.inputs = data['audio']
         self.context = data['station']
         self.labels = data['label']
