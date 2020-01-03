@@ -42,7 +42,7 @@ class Trainer:
         for i, (inputs, contexts, labels) in enumerate(train_loader):
             inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
             self.optimizer.zero_grad()
-            outputs = self.model((inputs, contexts))
+            outputs = self.model(inputs, contexts)
             loss = self.criterion(outputs, labels)
             accuracy = self._accuracy(outputs, labels)
             # print(f'batch accuracy {accuracy}')
@@ -61,7 +61,7 @@ class Trainer:
         with torch.no_grad():
             for i, (inputs, contexts, labels) in enumerate(val_loader):
                 inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
-                outputs = self.model((inputs, contexts))
+                outputs = self.model(inputs, contexts)
                 loss = self.criterion(outputs, labels)
                 accuracy = self._accuracy(outputs, labels)
                 # print(f'batch accuracy {accuracy}')

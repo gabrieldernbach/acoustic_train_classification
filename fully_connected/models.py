@@ -81,8 +81,7 @@ class ConditionLayer(nn.Module):
         self.batch_norm = nn.BatchNorm1d(outs)
         self.drop_out = nn.Dropout(dropout_rate)
 
-    def forward(self, inputs):
-        sample, context = inputs
+    def forward(self, sample, context):
         h = self.fc(sample).unsqueeze(-1)
         W = self.affine_W(context).reshape(-1, self.outs, self.outs)
         b = self.affine_b(context).unsqueeze(-1)
@@ -96,4 +95,10 @@ class ConditionNet(nn.Module):
         super(ConditionNet, self).__init__()
         self.cl1 = ConditionLayer(ins=320, outs=100, context=3)
         self.cl2 = ConditionLayer(ins=100, outs=40, context=3)
-        self.cl1 = ConditionLayer(ins=40, outs=2, context=3)
+        self.cl3 = ConditionLayer(ins=40, outs=2, context=3, dropout_rate=0, non_linear=False)
+
+    def forward(self, sample, context):
+        h = self.cl1(sample, context)
+        h = self.cl2(h, context)
+        h = self.cl3(h, context)
+        return h

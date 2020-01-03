@@ -16,7 +16,7 @@ ex = Experiment("FC Conditional")
 @ex.config
 def cfg():
     learning_rate = 0.001
-    epochs = 80
+    epochs = 3
     early_stop_patience = 35
     batch_size = 5000
 
