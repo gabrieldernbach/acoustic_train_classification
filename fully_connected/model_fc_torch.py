@@ -7,7 +7,6 @@ Targets are either the binary labels of detection {0, 1},
 or the amount of samples in the section labeled as detected [0, 1].
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,7 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn.metrics import confusion_matrix, roc_auc_score
 
-from baseline_fully_connected.utils import load_monolithic
+from fully_connected.utils import load_monolithic
 
 
 class ONN(nn.Module):
@@ -98,11 +97,11 @@ def train_model(model, criterion, optimizer, num_epochs, early_stopping, verbose
 
 
 if __name__ == '__main__':
-    subsets = ['data_monolithic_mfcc_BHV.pkl',
-               'data_monolithic_mfcc_BRL.pkl',
-               'data_monolithic_mfcc_VLD.pkl',
-               'data_monolithic_mfcc.pkl', ]
-    # subsets = ['data_monolithic_mfcc.pkl']
+    # subsets = ['data_monolithic_mfcc_BHV.pkl',
+    #            'data_monolithic_mfcc_BRL.pkl',
+    #            'data_monolithic_mfcc_VLD.pkl',
+    #            'data_monolithic_mfcc.pkl', ]
+    subsets = ['data_monolithic_mfcc.pkl']
 
     cross_scores = np.zeros([len(subsets), len(subsets)])
 
@@ -135,7 +134,8 @@ if __name__ == '__main__':
             X_test = X_test.reshape(len(X_test), 1, -1)
 
             net = DropNN()
-            net(X_train)
+            # net(X_train)
+
             train_model(model=net,
                         criterion=nn.BCELoss(),
                         optimizer=optim.Adam(net.parameters(),
@@ -169,18 +169,18 @@ if __name__ == '__main__':
     cross_scores = np.round(cross_scores, decimals=2)
     print(cross_scores)
 
-    labels = ['BHV', 'BRL', 'VLD', 'ALL']
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    cax = ax.matshow(cross_scores)
-    plt.title('AUC Across Stations')
-    fig.colorbar(cax)
-    ax.set_xticklabels([''] + labels)
-    ax.set_yticklabels([''] + labels)
-    plt.xlabel('Tested on')
-    plt.ylabel('Trained on')
-    for i in range(len(labels)):
-        for j in range(len(labels)):
-            text = ax.text(j, i, cross_scores[i, j],
-                           ha="center", va="center", color="w")
-    plt.show()
+    # labels = ['BHV', 'BRL', 'VLD', 'ALL']
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # cax = ax.matshow(cross_scores)
+    # plt.title('AUC Across Stations')
+    # fig.colorbar(cax)
+    # ax.set_xticklabels([''] + labels)
+    # ax.set_yticklabels([''] + labels)
+    # plt.xlabel('Tested on')
+    # plt.ylabel('Trained on')
+    # for i in range(len(labels)):
+    #     for j in range(len(labels)):
+    #         text = ax.text(j, i, cross_scores[i, j],
+    #                        ha="center", va="center", color="w")
+    # plt.show()

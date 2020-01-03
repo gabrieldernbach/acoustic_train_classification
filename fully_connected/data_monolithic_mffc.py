@@ -78,7 +78,7 @@ def mfcc_vec(x):
 
 def transform(dataset):
     X = dataset.audio
-    S = data.station
+    S = dataset.station
     Y = dataset.label_vec
 
     print('starting transform')
@@ -97,7 +97,7 @@ def transform(dataset):
 
 
 if __name__ == '__main__':
-    save_subsets = False
+    # save_subsets = False
     root = os.path.abspath('../data/')
     _, stations, _ = next(os.walk(root))
     stations = [f for f in stations if not f.startswith('.')]

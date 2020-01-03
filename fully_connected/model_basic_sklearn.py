@@ -4,7 +4,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 
-from baseline_fully_connected.utils import load_monolithic
+from fully_connected.utils import load_monolithic
 
 
 def evaluate(clf, inputs, labels):

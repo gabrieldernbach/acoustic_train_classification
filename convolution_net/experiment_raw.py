@@ -10,7 +10,7 @@ from torchvision import transforms
 
 from convolution_net.data_augmentations import Resize, MelSpectrogram
 from convolution_net.data_set_custom import RawDataset, split, balancing_sample_weights
-from convolution_net.model import ResNet224
+from convolution_net.models import ResNet224
 from convolution_net.trainer import Trainer
 
 ex = Experiment("OnMel")

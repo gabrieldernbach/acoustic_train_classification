@@ -8,7 +8,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 
-from baseline_fully_connected.utils import treshhold_labels, normalize_data, load_monolithic
+from fully_connected.utils import treshhold_labels, normalize_data, load_monolithic
 
 if __name__ == '__main__':
     train, dev, test = load_monolithic('data_monolithic_mfcc.pkl')

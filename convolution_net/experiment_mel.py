@@ -8,7 +8,7 @@ from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader
 
 from data_set_custom import MelDataset
-from model import ResNet128
+from models import ResNet128
 from trainer import Trainer
 
 ex = Experiment("OnMel")

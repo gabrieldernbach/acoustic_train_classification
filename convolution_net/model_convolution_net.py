@@ -18,9 +18,9 @@ from efficientnet_pytorch import EfficientNet
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from baseline_fully_connected.utils import split
 from convolution_net.data_augmentations import Spectrogram, Resize, ExpandDim
 from convolution_net.data_set_custom import RawDataset
+from fully_connected.utils import split
 
 
 def train_model(model, criterion, optimizer, num_epochs, early_stopping):
