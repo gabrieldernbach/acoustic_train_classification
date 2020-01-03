@@ -89,7 +89,7 @@ def transform(dataset):
     print('start mfcc')
     X = [mfcc_vec(x) for x in tqdm(X)]
     X = np.concatenate(X, axis=-1).T
-    S = np.concatenate(S, axis=-1)[:, 0]  # only take first element of station
+    S = np.concatenate(S, axis=-1).T[:, 0]  # only take first element of station
     Y = np.concatenate(Y, axis=-1)
     Y = (Y.sum(axis=0) / 8000)
 
