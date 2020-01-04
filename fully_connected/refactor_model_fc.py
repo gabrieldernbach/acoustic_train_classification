@@ -4,11 +4,11 @@ from sacred import Experiment
 from sacred.observers import MongoObserver
 from torch.utils.data import TensorDataset, DataLoader
 
-from models import ConditionNet
+from models import ElementConditionNet
 from trainer import Trainer
 from utils import load_monolithic, subset_to_tensor, evaluate_model, class_imbalance_sampler
 
-ex = Experiment("MFCC DropNet with Class Imbalance")
+ex = Experiment("MFCC condition net with Class Imbalance")
 path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
 ex.observers.append(MongoObserver(url=path))
 
@@ -16,7 +16,7 @@ ex.observers.append(MongoObserver(url=path))
 @ex.config
 def cfg():
     learning_rate = 0.001
-    epochs = 50
+    epochs = 200
     early_stop_patience = 35
     batch_size = 5000
 
@@ -39,7 +39,7 @@ def main(learning_rate, epochs, early_stop_patience, batch_size, _run):
     validation_loader = DataLoader(TensorDataset(*validation), batch_size=batch_size, num_workers=4)
     test_loader = DataLoader(TensorDataset(*test), batch_size=batch_size)
 
-    model = ConditionNet()
+    model = ElementConditionNet()
 
     trainer = Trainer(model=model,
                       criterion=nn.BCELoss(),
@@ -52,4 +52,4 @@ def main(learning_rate, epochs, early_stop_patience, batch_size, _run):
 
     trainer.fit(train_loader, validation_loader)
     roc, f1, confmat = evaluate_model(model, test)
-    return roc, f1, confmat
+    return f'roc {roc:.3}, f1 {f1:.3}, confmat'

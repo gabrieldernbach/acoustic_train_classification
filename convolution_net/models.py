@@ -14,11 +14,11 @@ For the outputs we prepend one fully connected layer mapping to 1000 nodes to 1.
 """
 eff_net = EfficientNet.from_name('efficientnet-b0')
 first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 2), nn.Softmax(dim=-1))
+eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 1), nn.Softmax(dim=-1))
 
 squeezenet = torch.hub.load('pytorch/vision:v0.4.2', 'squeezenet1_0', pretrained=True)
 first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 2), nn.Softmax(dim=1))
+squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 1), nn.Softmax(dim=1))
 
 
 class ConvBlock(nn.Module):
@@ -98,7 +98,7 @@ ResNet224 = nn.Sequential(  # beginning shape 224
     ConvBlock(256, 128),
     ConvBlock(128, 64),
     ConvBlock(64, 32),
-    ConvBlock(32, 2),
+    ConvBlock(32, 1),
     Flatten()
 )
 
@@ -122,7 +122,7 @@ ResNet128 = nn.Sequential(  # input shape 128, 63
     ResBlock(512, 512, stride=2),  # 2, 1
     ResBlock(512, 512, stride=2),  # 1, 1
     ResBlock(512, 256),
-    ConvBlock(256, 2),
+    ConvBlock(256, 1),
     Flatten()
 )
 
@@ -135,7 +135,7 @@ VggNet224 = nn.Sequential(  # input shape 224
     ConvBlock(512, 256, stride=2),  # 4
     ConvBlock(256, 128, stride=2),  # 2
     ConvBlock(128, 64, stride=2),  # 1
-    ConvBlock(64, 2),
+    ConvBlock(64, 1),
     Flatten()
 )
 

@@ -8,8 +8,8 @@ from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader
 
 from data_set_custom import MelDataset
-from models import ResNet128
-from trainer import Trainer
+from .models import ResNet128
+from .trainer import Trainer
 
 ex = Experiment("OnMel")
 path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
@@ -35,6 +35,9 @@ def main(learning_rate, epochs, _run):
     files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
+
+    MelDataset(train_path)
+
     train_loader = DataLoader(MelDataset(train_path), batch_size=20, num_workers=4, pin_memory=True)
     validation_loader = DataLoader(MelDataset(validation_path), batch_size=20, num_workers=4, pin_memory=True)
     test_loader = DataLoader(MelDataset(test_path), batch_size=20, num_workers=4, pin_memory=True)
@@ -44,7 +47,7 @@ def main(learning_rate, epochs, _run):
 
     trainer = Trainer(model=model,
                       device=device,
-                      criterion=nn.CrossEntropyLoss(),
+                      criterion=nn.BCELoss(),
                       optimizer=optim.AdamW(model.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
                       epochs=epochs,
                       callback=logger,

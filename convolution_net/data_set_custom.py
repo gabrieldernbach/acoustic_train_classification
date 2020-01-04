@@ -24,7 +24,7 @@ class MelDataset(Dataset):
 
     def __getitem__(self, idx):
         inputs = self.inputs[idx]
-        context = self.context[0]  # todo: need one hot encoding first!
+        context = self.context[0]  # todo: need to implement context reading
         labels = self.labels[idx]
 
         # convert labels

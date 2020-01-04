@@ -73,3 +73,42 @@ class ConditionNet(nn.Module):
         h = self.cl2(h, context)
         h = torch.sigmoid(self.cl3(h, context))
         return h.squeeze()
+
+
+class ElementConditionLayer(nn.Module):
+    def __init__(self, ins, outs, context, dropout_rate=0.3, non_linear=True):
+        super(ElementConditionLayer, self).__init__()
+        self.ins, self.outs, self.contexts = ins, outs, context
+        self.non_linear = non_linear
+
+        self.fc = nn.Linear(ins, outs)
+        self.affine_w = nn.Embedding(context, outs)
+        self.affine_b = nn.Embedding(context, outs)
+        self.batch_norm = nn.BatchNorm1d(outs)
+        self.drop_out = nn.Dropout(dropout_rate)
+
+    def forward(self, sample, context):
+        h = self.fc(sample)
+        w = self.affine_w(context)
+        b = self.affine_b(context)
+        z = self.batch_norm(w * h + b)
+        a = F.relu(z) if self.non_linear else z
+        return self.drop_out(a.squeeze())
+
+
+class ElementConditionNet(nn.Module):
+    def __init__(self):
+        super(ElementConditionNet, self).__init__()
+        self.cl1 = ElementConditionLayer(ins=320, outs=320, context=3)
+        self.cl2 = ElementConditionLayer(ins=320, outs=200, context=3)
+        self.cl3 = ElementConditionLayer(ins=200, outs=100, context=3)
+        self.cl4 = ElementConditionLayer(ins=100, outs=40, context=3)
+        self.cl5 = ElementConditionLayer(ins=40, outs=1, context=3, dropout_rate=0, non_linear=False)
+
+    def forward(self, sample, context):
+        h = self.cl1(sample, context)
+        h = self.cl2(h, context)
+        h = self.cl3(h, context)
+        h = self.cl4(h, context)
+        h = torch.sigmoid(self.cl5(h, context))
+        return h.squeeze()
