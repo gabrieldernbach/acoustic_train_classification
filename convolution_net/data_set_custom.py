@@ -29,7 +29,7 @@ class MelDataset(Dataset):
 
         # convert labels
         inputs = torch.from_numpy(inputs).float()
-        labels = torch.tensor(labels).long()
+        labels = torch.tensor(labels).float()
         # context = torch.tensor(context).long()
         if self.transform:
             inputs = self.transform(inputs)

@@ -51,5 +51,8 @@ def main(learning_rate, epochs, early_stop_patience, batch_size, _run):
                       )
 
     trainer.fit(train_loader, validation_loader)
+    roc, f1, confmat = evaluate_model(model, validation)
+    print(f'confusion matrix of validation set {confmat}')
     roc, f1, confmat = evaluate_model(model, test)
-    return f'roc {roc:.3}, f1 {f1:.3}, confmat'
+    print(f'confusion matrix of test set {confmat}')
+    return f'roc {roc:.3}, f1 {f1:.3}'

@@ -41,6 +41,10 @@ class DropNN(nn.Module):
 
 
 class ConditionLayer(nn.Module):
+    """
+    Linear Layer with subsequent context dependent Affine Transformation
+    """
+
     def __init__(self, ins, outs, context, dropout_rate=0.3, non_linear=True):
         super(ConditionLayer, self).__init__()
         self.ins, self.outs, self.contexts = ins, outs, context
@@ -62,6 +66,10 @@ class ConditionLayer(nn.Module):
 
 
 class ConditionNet(nn.Module):
+    """
+    Fully Connected Network that allows for a categorical context as conditional
+    """
+
     def __init__(self):
         super(ConditionNet, self).__init__()
         self.cl1 = ConditionLayer(ins=320, outs=100, context=3)
@@ -76,6 +84,10 @@ class ConditionNet(nn.Module):
 
 
 class ElementConditionLayer(nn.Module):
+    """
+    A layer that incorporates a context dependent multiplication 'w' and offset 'b'
+    """
+
     def __init__(self, ins, outs, context, dropout_rate=0.3, non_linear=True):
         super(ElementConditionLayer, self).__init__()
         self.ins, self.outs, self.contexts = ins, outs, context
@@ -97,6 +109,11 @@ class ElementConditionLayer(nn.Module):
 
 
 class ElementConditionNet(nn.Module):
+    """
+    Fully Connected Network that allows for a categorial context as conditional,
+    condigioning is applied layer wise by per activation multiplication and offset
+    """
+
     def __init__(self):
         super(ElementConditionNet, self).__init__()
         self.cl1 = ElementConditionLayer(ins=320, outs=320, context=3)

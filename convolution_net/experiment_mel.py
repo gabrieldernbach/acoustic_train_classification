@@ -4,12 +4,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from sacred import Experiment
-from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader
 
 from data_set_custom import MelDataset
-from .models import ResNet128
-from .trainer import Trainer
+from models import ResNet128
+from trainer import Trainer
 
 ex = Experiment("OnMel")
 path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
@@ -48,7 +47,7 @@ def main(learning_rate, epochs, _run):
     trainer = Trainer(model=model,
                       device=device,
                       criterion=nn.BCELoss(),
-                      optimizer=optim.AdamW(model.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
+                      optimizer=optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
                       epochs=epochs,
                       callback=logger,
                       early_stop_patience=20,
