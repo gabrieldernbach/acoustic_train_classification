@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -30,43 +31,13 @@ class DropNN(nn.Module):
         super(DropNN, self).__init__()
         self.fc1 = LinearRegularized(320, 100)
         self.fc2 = LinearRegularized(100, 40)
-        self.fc3 = nn.Linear(40, 2)
+        self.fc3 = nn.Linear(40, 1)
 
-    def forward(self, x):
+    def forward(self, x, contexts):
         x = self.fc1(x)
         x = self.fc2(x)
-        x = self.fc3(x)
-        return x
-
-
-class OldConditionNet(nn.Module):
-    def __init__(self, layer_shapes=None, n_context=3):
-        super(OldConditionNet, self).__init__()
-        if layer_shapes is None:
-            layer_shapes = [2, 80, 2]
-
-        self.layer_shapes = layer_shapes
-
-        self.fc1 = nn.Linear(layer_shapes[0], layer_shapes[1])
-        self.fc1_affineW = nn.Linear(n_context, layer_shapes[1] ** 2)
-        self.fc1_affineB = nn.Linear(n_context, layer_shapes[1])
-
-        self.fc2 = nn.Linear(layer_shapes[1], layer_shapes[2])
-        self.fc2_affineW = nn.Linear(n_context, layer_shapes[2] ** 2)
-        self.fc2_affineB = nn.Linear(n_context, layer_shapes[2])
-
-    def forward(self, sample, context):
-        h1 = self.fc1(sample).unsqueeze(-1)
-        W1 = self.fc1_affineW(context).reshape(-1, self.layer_shapes[1], self.layer_shapes[1])
-        b1 = self.fc1_affineB(context).unsqueeze(-1)
-        a1 = F.relu(W1 @ h1 + b1).squeeze()
-
-        h2 = self.fc2(a1).unsqueeze(-1)
-        W2 = self.fc2_affineW(context).reshape(-1, 2, 2)
-        b2 = self.fc2_affineB(context).unsqueeze(-1)
-        a2 = (W2 @ h2 + b2).squeeze()
-
-        return a2
+        x = torch.sigmoid(self.fc3(x))
+        return x.squeeze()
 
 
 class ConditionLayer(nn.Module):
@@ -95,10 +66,10 @@ class ConditionNet(nn.Module):
         super(ConditionNet, self).__init__()
         self.cl1 = ConditionLayer(ins=320, outs=100, context=3)
         self.cl2 = ConditionLayer(ins=100, outs=40, context=3)
-        self.cl3 = ConditionLayer(ins=40, outs=2, context=3, dropout_rate=0, non_linear=False)
+        self.cl3 = ConditionLayer(ins=40, outs=1, context=3, dropout_rate=0, non_linear=False)
 
     def forward(self, sample, context):
         h = self.cl1(sample, context)
         h = self.cl2(h, context)
-        h = self.cl3(h, context)
-        return h
+        h = torch.sigmoid(self.cl3(h, context))
+        return h.squeeze()

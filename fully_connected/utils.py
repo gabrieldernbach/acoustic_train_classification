@@ -3,7 +3,6 @@ import pickle
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 from torch.utils.data import WeightedRandomSampler
 
@@ -48,25 +47,27 @@ def subset_to_tensor(subset):
     inputs = torch.from_numpy(subset[0]).float()
     # context = torch.from_numpy(x[1].values).long()
     context = torch.from_numpy(np.zeros(len(inputs))).long()
-    labels = torch.from_numpy(subset[2]).long()
+    labels = torch.from_numpy(subset[2]).float()
     return inputs, context, labels
 
 
-def evaluate_model(model, inputs, labels):
-    predictions = F.softmax(model(inputs), dim=1)[:, 1].detach().numpy()
-    labels = labels.detach().numpy()
+def evaluate_model(model, subset):
+    inputs, contexts, labels = subset
+    # predictions = F.softmax(model(inputs, contexts), dim=1)[:, 1].detach().numpy()  # multiclass
+    predictions = model(inputs, contexts).detach().numpy()
+    labels = labels.detach().numpy() > 0.35
     roc = roc_auc_score(labels, predictions)
     f1 = f1_score(labels, predictions > 0.5)
     confmat = confusion_matrix(labels, predictions > 0.5)
-    print(roc, f1, confmat)
     return roc, f1, confmat
 
 
-def class_imbalance_sampler(labels):
+def class_imbalance_sampler(labels, threshold=0.35):
     """
     Takes integer class labels and returns the torch sampler
     for balancing the class prior distribution
     """
+    labels = (labels > 0.35).long()
     class_count = torch.bincount(labels)
     weighting = 1. / class_count.float()
     weights = weighting[labels]

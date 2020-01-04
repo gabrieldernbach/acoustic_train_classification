@@ -69,7 +69,8 @@ class Trainer:
                 self.validation_accuracy += 1 / (i + 1) * (accuracy - self.validation_accuracy)
 
     def _accuracy(self, outputs, labels):
-        _, predicted = torch.max(outputs.data, 1)
+        # _, predicted = torch.max(outputs.data, 1)  # for one multi class classification
+        predicted = outputs.data > 0.5
         correct = (predicted == labels).sum().item()
         return correct / len(labels)
 
