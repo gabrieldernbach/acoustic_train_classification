@@ -26,6 +26,7 @@ class Trainer:
 
             self._train_step(train_loader)
             self._validation_step(val_loader)
+            self.evaluate(val_loader)
 
             self.early_stopping(self.validation_loss, self.model)
             if self.early_stopping.early_stop:

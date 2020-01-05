@@ -129,17 +129,18 @@ ResNet128 = nn.Sequential(  # input shape 128, 63
     Flatten(),
 )
 
-VggNet224 = nn.Sequential(  # input shape 224
-    ConvBlock(1, 32, stride=2),  # remaining shape 122
-    ConvBlock(32, 64, stride=2),  # 61
-    ConvBlock(64, 128, stride=2),  # 31
-    ConvBlock(128, 256, stride=2),  # 16
-    ConvBlock(256, 512, stride=2),  # 8
-    ConvBlock(512, 256, stride=2),  # 4
-    ConvBlock(256, 128, stride=2),  # 2
-    ConvBlock(128, 64, stride=2),  # 1
-    ConvBlock(64, 1),
-    Flatten(),
-)
 
-# todo: build with bilinear layers torch.nn.Bilinear
+class VGGNet(nn.Module):
+    def __init__(self, in_c, enc_sizes, n_outs):
+        super().__init__()
+        self.enc_sizes = [in_c, *enc_sizes]
+        blocks = [ConvBlock(ni, nf, stride=2)
+                  for ni, nf in zip(self.enc_sizes, self.enc_sizes[1:])]
+
+        blocks.append(ConvBlock(self.enc_sizes[-1], n_outs))
+        blocks.append(Flatten())
+
+        self.encoder = nn.Sequential(*blocks)
+
+    def forward(self, x):
+        return self.encoder(x)
