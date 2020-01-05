@@ -8,6 +8,7 @@ import multiprocessing as mp
 import librosa
 import numpy as np
 import torch
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
 from torch.utils.data import Dataset, WeightedRandomSampler
 
 
@@ -27,10 +28,6 @@ class MelDataset(Dataset):
         context = self.station[idx]  # todo: need to implement context reading
         labels = self.labels[idx]
 
-        # convert labels
-        inputs = torch.from_numpy(inputs).float()
-        labels = torch.tensor(labels).float()
-        # context = torch.tensor(context).long()
         if self.transform:
             inputs = self.transform(inputs)
 
@@ -179,6 +176,18 @@ def class_imbalance_sampler(labels, threshold=0.35):
     weights = weighting[labels]
     sampler = WeightedRandomSampler(weights, len(labels))
     return sampler
+
+
+def evaluate_model(model, subset):
+    inputs, contexts, labels = subset
+    # predictions = F.softmax(model(inputs, contexts), dim=1)[:, 1].detach().numpy()  # multiclass
+    predictions = model(inputs, contexts).detach().numpy()
+    labels = labels.detach().numpy() > 0.35
+    roc = roc_auc_score(labels, predictions)
+    f1 = f1_score(labels, predictions > 0.5)
+    confmat = confusion_matrix(labels, predictions > 0.5)
+    return roc, f1, confmat
+
 
 if __name__ == '__main__':
     # test RawDataset

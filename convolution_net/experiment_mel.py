@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from conv_models import ResNet128
 from conv_trainer import Trainer
-from data_set_custom import MelDataset, class_imbalance_sampler
+from data_set_custom import MelDataset, class_imbalance_sampler, evaluate_model
 
 ex = Experiment("SmallMel")
 
@@ -45,7 +45,6 @@ def main(learning_rate, epochs, _run):
                               num_workers=4,
                               pin_memory=True)
     validation_loader = DataLoader(MelDataset(validation_path),
-                                   sampler=sampler,
                                    batch_size=20,
                                    num_workers=4,
                                    pin_memory=True)
@@ -69,4 +68,6 @@ def main(learning_rate, epochs, _run):
 
     trainer.fit(train_loader, validation_loader)
 
-    _run.result = trainer.validation_accuracy
+    roc, f1, confmat = evaluate_model(trainer, test_loader)
+
+    return f'roc {roc:.3} - f1 {f1:.3}'
