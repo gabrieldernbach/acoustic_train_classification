@@ -43,6 +43,8 @@ class Trainer:
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
             loss = self.criterion(outputs, labels)
+            # print(f'outputs {outputs}')
+            # print(f'labels {labels}')
             accuracy = self._accuracy(outputs, labels)
             # print(f'batch accuracy {accuracy}')
             self.training_loss += loss.item()

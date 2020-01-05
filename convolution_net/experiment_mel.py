@@ -3,17 +3,16 @@ import os
 import torch.nn as nn
 import torch.optim as optim
 from sacred import Experiment
+from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader
 
-from conv_models import ResNet128
+from conv_models import eff_net
 from conv_trainer import Trainer
 from data_set_custom import MelDataset, class_imbalance_sampler, evaluate_model
 
-ex = Experiment("SmallMel")
-
-
-# path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
-# ex.observers.append(MongoObserver(url=path))
+ex = Experiment("Mel Efficient Net SGD")
+path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
+ex.observers.append(MongoObserver(url=path))
 
 
 @ex.config
@@ -31,7 +30,7 @@ def logger(trainer):
 
 
 @ex.automain
-def main(learning_rate, epochs, _run):
+def main(learning_rate, batch_size, epochs):
     files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
@@ -41,7 +40,7 @@ def main(learning_rate, epochs, _run):
     sampler = class_imbalance_sampler(train_set.labels)
     train_loader = DataLoader(train_set,
                               sampler=sampler,
-                              batch_size=200,
+                              batch_size=batch_size,
                               num_workers=4,
                               pin_memory=True)
     validation_loader = DataLoader(MelDataset(validation_path),
@@ -57,9 +56,8 @@ def main(learning_rate, epochs, _run):
     model = ResNet128.to(device)
 
     trainer = Trainer(model=model,
-                      device=device,
-                      criterion=nn.BCELoss(),
-                      optimizer=optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
+                      criterion=nn.BCEWithLogitsLoss(),
+                      optimizer=optim.SGD(model.parameters(), lr=learning_rate),
                       epochs=epochs,
                       callback=logger,
                       early_stop_patience=20,

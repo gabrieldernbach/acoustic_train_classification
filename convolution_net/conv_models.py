@@ -3,6 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from efficientnet_pytorch import EfficientNet
 
+
+class Flatten(nn.Module):
+    """
+    Flatten the 1 x 1 x C Tensor of the fully convolutional network
+    """
+
+    def forward(self, input):
+        return input.squeeze()
+
+
 """
 Modified Efficient Net (Key Feature : Scalability)
 The network was originally specified for imagenet which
@@ -14,11 +24,11 @@ For the outputs we prepend one fully connected layer mapping to 1000 nodes to 1.
 """
 eff_net = EfficientNet.from_name('efficientnet-b0')
 first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 1), nn.Softmax(dim=-1))
+eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 1), Flatten())
 
 squeezenet = torch.hub.load('pytorch/vision:v0.4.2', 'squeezenet1_0', pretrained=True)
 first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 1), nn.Softmax(dim=1))
+squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 1, Flatten()))
 
 
 class ConvBlock(nn.Module):
@@ -63,13 +73,6 @@ class ResBlock(nn.Module):
         return out
 
 
-class Flatten(nn.Module):
-    """
-    Flatten the 1 x 1 x C Tensor of the fully convolutional network
-    """
-
-    def forward(self, input):
-        return input.view(input.size(0), -1)
 
 
 ResNet224 = nn.Sequential(  # beginning shape 224
@@ -123,7 +126,7 @@ ResNet128 = nn.Sequential(  # input shape 128, 63
     ResBlock(512, 512, stride=2),  # 1, 1
     ResBlock(512, 256),
     ConvBlock(256, 1),
-    Flatten()
+    Flatten(),
 )
 
 VggNet224 = nn.Sequential(  # input shape 224
@@ -136,7 +139,7 @@ VggNet224 = nn.Sequential(  # input shape 224
     ConvBlock(256, 128, stride=2),  # 2
     ConvBlock(128, 64, stride=2),  # 1
     ConvBlock(64, 1),
-    Flatten()
+    Flatten(),
 )
 
 # todo: build with bilinear layers torch.nn.Bilinear
