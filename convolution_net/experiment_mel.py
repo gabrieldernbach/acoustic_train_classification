@@ -1,18 +1,19 @@
 import os
 
-import torch
 import torch.nn as nn
 import torch.optim as optim
 from sacred import Experiment
 from torch.utils.data import DataLoader
 
-from data_set_custom import MelDataset
-from models import ResNet128
-from trainer import Trainer
+from conv_models import ResNet128
+from conv_trainer import Trainer
+from data_set_custom import MelDataset, class_imbalance_sampler
 
-ex = Experiment("OnMel")
-path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
-ex.observers.append(MongoObserver(url=path))
+ex = Experiment("SmallMel")
+
+
+# path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
+# ex.observers.append(MongoObserver(url=path))
 
 
 @ex.config
@@ -35,11 +36,23 @@ def main(learning_rate, epochs, _run):
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
 
-    MelDataset(train_path)
+    train_set = MelDataset(train_path)
 
-    train_loader = DataLoader(MelDataset(train_path), batch_size=20, num_workers=4, pin_memory=True)
-    validation_loader = DataLoader(MelDataset(validation_path), batch_size=20, num_workers=4, pin_memory=True)
-    test_loader = DataLoader(MelDataset(test_path), batch_size=20, num_workers=4, pin_memory=True)
+    sampler = class_imbalance_sampler(train_set.labels)
+    train_loader = DataLoader(train_set,
+                              sampler=sampler,
+                              batch_size=200,
+                              num_workers=4,
+                              pin_memory=True)
+    validation_loader = DataLoader(MelDataset(validation_path),
+                                   sampler=sampler,
+                                   batch_size=20,
+                                   num_workers=4,
+                                   pin_memory=True)
+    test_loader = DataLoader(MelDataset(test_path),
+                             batch_size=20,
+                             num_workers=4,
+                             pin_memory=True)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = ResNet128.to(device)

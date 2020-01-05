@@ -8,7 +8,7 @@ import multiprocessing as mp
 import librosa
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, WeightedRandomSampler
 
 
 class MelDataset(Dataset):
@@ -18,13 +18,13 @@ class MelDataset(Dataset):
         self.transform = transform
 
         data = np.load(datapath, allow_pickle=True)
-        self.inputs = data['audio']
-        self.context = data['station']
-        self.labels = data['label']
+        self.inputs = torch.from_numpy(data['audio']).float()
+        self.station = torch.from_numpy(data['station']).long()
+        self.labels = torch.from_numpy(data['label']).float()
 
     def __getitem__(self, idx):
         inputs = self.inputs[idx]
-        context = self.context[0]  # todo: need to implement context reading
+        context = self.station[idx]  # todo: need to implement context reading
         labels = self.labels[idx]
 
         # convert labels
@@ -168,22 +168,17 @@ def split(data, a=0.6, b=0.8):
     return train, validation, test
 
 
-def balancing_sample_weights(data_loader):
+def class_imbalance_sampler(labels, threshold=0.35):
     """
-    returns for each sample in data loader the corresponding weight to balance the classes.
-    The weight is the reciprocal of the relative class frequency.
+    Takes integer class labels and returns the torch sampler
+    for balancing the class prior distribution
     """
-    labels = []
-    for i, (sample, context, label) in enumerate(data_loader):
-        labels.append(label.numpy())
-    labels = np.concatenate(labels)
-    n_samples = len(labels)
-    labels = (labels != 0) * 1
-    ratio = np.bincount(labels)
-    weights = 1. / ratio
-    sample_weights = weights[labels]
-    return torch.from_numpy(sample_weights), n_samples
-
+    labels = (labels > threshold).long()
+    class_count = torch.bincount(labels)
+    weighting = 1. / class_count.float()
+    weights = weighting[labels]
+    sampler = WeightedRandomSampler(weights, len(labels))
+    return sampler
 
 if __name__ == '__main__':
     # test RawDataset

@@ -8,10 +8,10 @@ from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import transforms
 
+from convolution_net.conv_models import ResNet224
+from convolution_net.conv_trainer import Trainer
 from convolution_net.data_augmentations import Resize, MelSpectrogram
 from convolution_net.data_set_custom import RawDataset, split, balancing_sample_weights
-from convolution_net.models import ResNet224
-from convolution_net.trainer import Trainer
 
 ex = Experiment("OnMel")
 path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"

@@ -58,8 +58,9 @@ def extract_aup(aup_path):
         end = element.attrib['t1']
         marks_in_s.append((start, end))
     label_vec, detection = mark_to_vec(marks_in_s, audio_len)
+    station_vec = np.repeat(station_id, audio_len)
 
-    return station, audio, label_vec, detection
+    return station_vec, audio, label_vec, detection
 
 
 def stmt(x):
@@ -67,7 +68,7 @@ def stmt(x):
     returns the normalized log short term mel spectrogram transformation of signal vector x
     """
     x = librosa.feature.melspectrogram(x, sr=8000, n_fft=512, hop_length=128)
-    x = np.log(x) + 1e-12
+    x = np.log(x + 1e-12)
     x -= np.mean(x)
     return x
 
@@ -76,15 +77,16 @@ def transform(dataset):
     X = dataset.audio
     S = dataset.station
     Y = dataset.label_vec
-    D = dataset.detection
 
     print('starting transform')
     X = [frame(x, frame_length=8000, hop_length=2000) for x in X]
     Y = [frame(y, frame_length=8000, hop_length=2000) for y in Y]
+    S = [frame(s, frame_length=8000, hop_length=2000) for s in S]
 
     X = np.concatenate(X, axis=-1).T
     X = [librosa.feature.melspectrogram(x, sr=8000, n_fft=512, hop_length=128) for x in tqdm(X)]
     X = np.stack(X)
+    S = np.concatenate(S, axis=-1).T[:, 0]
     Y = np.concatenate(Y, axis=-1)
     Y = (Y.sum(axis=0) / 8000)
 
@@ -97,7 +99,7 @@ if __name__ == '__main__':
     print(f'found sub folders for station {stations}')
 
     data = []
-    for station in stations:
+    for station_id, station in enumerate(stations):
         print(f'loading station {station}')
         data_path = root + '/' + station
         files = os.listdir(data_path)
@@ -113,24 +115,24 @@ if __name__ == '__main__':
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
     print('split data')
-    train, dev, test = split(data)
+    train, validation, test = split(data)
 
     print('start feature extraction')
-    train = transform(train)
-    dev = transform(dev)
-    test = transform(test)
+    X_train, S_train, Y_train = transform(train)
+    X_validation, S_validation, Y_validation = transform(validation)
+    X_test, S_test, Y_test = transform(test)
 
     np.savez('mel_train.npz',
-             audio=train[0],
-             station=train[1],
-             label=train[2])
+             audio=X_train,
+             station=S_train,
+             label=Y_train)
 
     np.savez('mel_validation.npz',
-             audio=dev[0],
-             station=dev[1],
-             label=dev[2])
+             audio=X_validation,
+             station=S_validation,
+             label=Y_validation)
 
     np.savez('mel_test.npz',
-             audio=test[0],
-             station=test[1],
-             label=test[2])
+             audio=X_test,
+             station=S_test,
+             label=Y_test)

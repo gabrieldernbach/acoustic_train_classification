@@ -4,8 +4,8 @@ from sacred import Experiment
 from sacred.observers import MongoObserver
 from torch.utils.data import TensorDataset, DataLoader
 
-from models import ElementConditionNet
-from trainer import Trainer
+from fc_models import ElementConditionNet
+from fc_trainer import Trainer
 from utils import load_monolithic, subset_to_tensor, evaluate_model, class_imbalance_sampler
 
 ex = Experiment("MFCC condition net with Class Imbalance")

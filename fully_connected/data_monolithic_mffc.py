@@ -28,7 +28,6 @@ def mark_to_vec(marks_in_s, len_sequence):
         end = round(float(mark[1]) * 8000)
         mark_in_samp.append([start, end])
 
-
     label_vec = np.zeros(len_sequence)
     for mark in mark_in_samp:
         label_vec[mark[0]:mark[1]] = 1
