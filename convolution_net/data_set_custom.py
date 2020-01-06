@@ -33,7 +33,7 @@ class MelDataset(Dataset):
 
         inputs = inputs.unsqueeze(0)
 
-        return inputs, context, labels
+        return inputs, labels
 
     def __len__(self):
         return len(self.inputs)
