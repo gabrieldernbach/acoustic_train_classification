@@ -104,4 +104,5 @@ test_prediction = model.predict_proba(x_test)
 print(roc_auc_score(y_test > .35, test_prediction))
 print(confusion_matrix(y_test > .35, test_prediction > .35))
 
-# https://www.pyimagesearch.com/2019/02/04/keras-multiple-inputs-and-mixed-data/
+# https://www.pyimagesearch.com/2019/02/04/keras-multiple-inputs-and-mixed-data/ -- for context inclusion
+# https://www.pyimagesearch.com/2019/08/05/keras-learning-rate-finder/ -- optimize training
