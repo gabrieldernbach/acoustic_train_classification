@@ -1,12 +1,13 @@
 import os
 
 import numpy as np
+import tensorflow.keras
 from sacred import Experiment
 from sacred.observers import MongoObserver
 from sacred.utils import apply_backspaces_and_linefeeds
 from sklearn.metrics import roc_auc_score, confusion_matrix
 from tensorflow.keras import optimizers
-from tensorflow.keras.callbacks import EarlyStopping, Callback
+from tensorflow.keras.callbacks import EarlyStopping, Callback, ReduceLROnPlateau
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
 from tensorflow.keras.models import Sequential
 
@@ -24,6 +25,18 @@ class LogMetrics(Callback):
 
     def on_batch_end(self, _, logs={}):
         return
+
+
+metrics = [
+    tensorflow.keras.metrics.TruePositives(name='tp'),
+    tensorflow.keras.metrics.FalsePositives(name='fp'),
+    tensorflow.keras.metrics.TrueNegatives(name='tn'),
+    tensorflow.keras.metrics.FalseNegatives(name='fn'),
+    tensorflow.keras.metrics.BinaryAccuracy(name='accuracy'),
+    tensorflow.keras.metrics.Precision(name='precision'),
+    tensorflow.keras.metrics.Recall(name='recall'),
+    tensorflow.keras.metrics.AUC(name='auc'),
+]
 
 
 @ex.config
@@ -45,6 +58,7 @@ def validation_metrcis(_run, logs):
 def train_metrics(_run, logs):
     _run.log_scalar('train_loss', float(logs.get('loss')))
     _run.log_scalar('train_accuracy', float(logs.get('accuracy')))
+    _run.log_scalar('train_auc_keras', float(logs.get('auc')))
 
 
 class RocCallback(Callback):
@@ -71,9 +85,9 @@ class RocCallback(Callback):
         roc_val = roc_auc_score(self.y_val, y_pred_val)
         print('\rroc-auc_train: %s - roc-auc_val: %s' % (str(round(roc_train, 4)), str(round(roc_val, 4))),
               end=100 * ' ' + '\n')
-        self._run.log_scalar('train_auc', roc_train)
-        self._run.log_scalar('validation_auc', roc_val)
-        self._run.result = roc_val
+        self._run.log_scalar('train_auc', float(roc_train))
+        self._run.log_scalar('validation_auc', float(roc_val))
+        self._run.result = float(roc_val)
         return
 
     def on_batch_begin(self, batch, logs={}):
@@ -129,20 +143,22 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
 
     batch_size = base_batch_size * scale_batch_rate
     lr = base_learning_rate * scale_batch_rate
+    lr_schedule = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=80, verbose=1, mode='auto',
+                                    min_delta=0.0001, cooldown=0, min_lr=0)
     sgd = optimizers.SGD(lr=lr)
     roc_callback = RocCallback(training_data=(x_train, y_train), validation_data=(x_test, y_test), _run=_run)
     early_stop = EarlyStopping(monitor='val_loss', min_delta=0, patience=early_stop_patience,
-                               verbose=0, mode='auto', restore_best_weights=True)
+                               verbose=1, mode='auto', restore_best_weights=True)
 
     model.compile(
         loss='binary_crossentropy',
         optimizer=sgd,
-        metrics=['accuracy']
+        metrics=metrics
     )
 
     model.fit(x=x_train, y=y_train, batch_size=batch_size,
               epochs=epochs, validation_data=(x_validation, y_validation),
-              callbacks=[early_stop, roc_callback, LogMetrics()])
+              callbacks=[lr_schedule, early_stop, roc_callback, LogMetrics()])
     model.save('vgg_unbalanced.h5')
 
     validation_prediction = model.predict_proba(x_validation)
