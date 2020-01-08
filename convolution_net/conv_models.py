@@ -141,20 +141,20 @@ ResNet224 = nn.Sequential(  # beginning shape 224
 
 ResNet128 = nn.Sequential(  # input shape 128, 63
     ConvBlock(1, 32, stride=2),  # remaining shape 64, 32
-    ResBlock(32, 32),
-    ResBlock(32, 32),
+    # ResBlock(32, 32),
+    # ResBlock(32, 32),
     ResBlock(32, 64, stride=2),  # 32, 16
-    ResBlock(64, 64),
-    ResBlock(64, 64),
+    # ResBlock(64, 64),
+    # ResBlock(64, 64),
     ResBlock(64, 128, stride=2),  # 16, 8
-    ResBlock(128, 128),
-    ResBlock(128, 128),
+    # ResBlock(128, 128),
+    # ResBlock(128, 128),
     ResBlock(128, 256, stride=2),  # 8, 4
-    ResBlock(256, 256),
-    ResBlock(256, 256),
+    # ResBlock(256, 256),
+    # ResBlock(256, 256),
     ResBlock(256, 512, stride=2),  # 4, 2
-    ResBlock(512, 512),
-    ResBlock(512, 512),
+    # ResBlock(512, 512),
+    # ResBlock(512, 512),
     ResBlock(512, 512, stride=2),  # 4, 2
     ResBlock(512, 512, stride=2),  # 2, 1
     ResBlock(512, 512, stride=2),  # 1, 1
