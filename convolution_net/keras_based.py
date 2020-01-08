@@ -53,7 +53,7 @@ def validation_metrcis(_run, logs):
     _run.log_scalar('val_loss', float(logs.get('val_loss')))
     _run.log_scalar('val_acc', float(logs.get('val_accuracy')))
     _run.log_scalar('val_auc', float(logs.get('val_auc')))
-    _run.result = float(logs.get('val_auc'))
+    _run.result = f"auc={logs.get('val_auc'):.3}"
 
 
 @ex.capture
@@ -82,20 +82,27 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     x_test = np.expand_dims(x_test, axis=-1)
 
     model = Sequential([
-        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(128, 63, 1)),
-        Conv2D(filters=32, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same', input_shape=(128, 63, 1)),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'),
         MaxPool2D(pool_size=(2, 2)),
         Dropout(rate=0.25),
-        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
-        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
         MaxPool2D(pool_size=(2, 2)),
         Dropout(rate=0.25),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
         MaxPool2D(pool_size=(2, 2)),
         Dropout(rate=0.25),
-        Conv2D(filters=256, kernel_size=(3, 3), activation='relu'),
-        Conv2D(filters=256, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        MaxPool2D(pool_size=(2, 2)),
+        Dropout(rate=0.25),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
         MaxPool2D(pool_size=(2, 2)),
         Dropout(rate=0.25),
         Flatten(),
