@@ -4,12 +4,9 @@ from efficientnet_pytorch import EfficientNet
 
 
 class Flatten(nn.Module):
-    """
-    Flatten the 1 x 1 x C Tensor of the fully convolutional network
-    """
-
     def forward(self, input):
-        return input.squeeze()
+        # return input.squeeze()
+        return input.view(input.size(0), -1)
 
 
 """
@@ -73,7 +70,44 @@ class ResBlock(nn.Module):
         return out
 
 
+VggNet = nn.Sequential(  # beginning shape 128 x 63
+    nn.Conv2d(1, 32, 3),
+    nn.ReLU(inplace=True),
+    nn.Conv2d(32, 32, 3),
+    nn.ReLU(inplace=True),
+    nn.MaxPool2d(2, 2),
+    nn.Dropout2d(0.25),
 
+    nn.Conv2d(32, 64, 3),
+    nn.ReLU(inplace=True),
+    nn.Conv2d(64, 64, 3),
+    nn.ReLU(inplace=True),
+    nn.MaxPool2d(2, 2),
+    nn.Dropout2d(0.25),
+
+    nn.Conv2d(64, 128, 3),
+    nn.ReLU(inplace=True),
+    nn.Conv2d(128, 128, 3),
+    nn.ReLU(inplace=True),
+    nn.MaxPool2d(2, 2),
+    nn.Dropout2d(0.25),
+
+    nn.Conv2d(128, 128, 3),
+    nn.ReLU(inplace=True),
+    nn.MaxPool2d(2, 2),
+    nn.Dropout2d(0.25),
+    Flatten(),
+
+    nn.Linear(640, 640),
+    nn.ReLU(inplace=True),
+    nn.Dropout(0.5),
+    nn.Linear(640, 300),
+    nn.ReLU(inplace=True),
+    nn.Dropout(0.5),
+    nn.Linear(300, 1),
+    nn.Sigmoid(),
+
+)
 
 ResNet224 = nn.Sequential(  # beginning shape 224
     ConvBlock(1, 64, stride=2),  # remaining shape 122
@@ -128,19 +162,3 @@ ResNet128 = nn.Sequential(  # input shape 128, 63
     ConvBlock(256, 1),
     Flatten(),
 )
-
-
-class VGGNet(nn.Module):
-    def __init__(self, in_c, enc_sizes, n_outs):
-        super().__init__()
-        self.enc_sizes = [in_c, *enc_sizes]
-        blocks = [ConvBlock(ni, nf, stride=2)
-                  for ni, nf in zip(self.enc_sizes, self.enc_sizes[1:])]
-
-        blocks.append(ConvBlock(self.enc_sizes[-1], n_outs))
-        blocks.append(Flatten())
-
-        self.encoder = nn.Sequential(*blocks)
-
-    def forward(self, x):
-        return self.encoder(x)

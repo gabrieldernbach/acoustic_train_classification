@@ -4,18 +4,19 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from sacred import Experiment
-from sacred.observers import MongoObserver
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import transforms
 
 from convolution_net.conv_models import ResNet224
-from convolution_net.conv_trainer import Trainer
+from convolution_net.conv_trainer import Learner
 from convolution_net.data_augmentations import Resize, MelSpectrogram
 from convolution_net.data_set_custom import RawDataset, split, balancing_sample_weights
 
 ex = Experiment("OnMel")
-path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
-ex.observers.append(MongoObserver(url=path))
+
+
+# path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
+# ex.observers.append(MongoObserver(url=path))
 
 
 @ex.config
@@ -89,9 +90,9 @@ def main(batch_size, epochs, learning_rate):
 
 
 if __name__ == "__main__":
-    r = ex.run(config_updates={'batch_size': 32})
-    r = ex.run(config_updates={'batch_size': 64})
-    r = ex.run(config_updates={'batch_size': 128})
-    r = ex.run(config_updates={'batch_size': 256})
+    ex.run(config_updates={'batch_size': 32})
+    ex.run(config_updates={'batch_size': 64})
+    ex.run(config_updates={'batch_size': 128})
+    ex.run(config_updates={'batch_size': 256})
 
 # todo labwatch hyper param search

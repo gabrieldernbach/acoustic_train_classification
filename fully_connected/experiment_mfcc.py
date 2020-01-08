@@ -1,7 +1,8 @@
+import os
+
 import torch
 import torch.nn as nn
 from sacred import Experiment
-from sacred.observers import MongoObserver
 from torch.utils.data import TensorDataset, DataLoader
 
 from fc_models import ElementConditionNet
@@ -9,8 +10,10 @@ from fc_trainer import Trainer
 from utils import load_monolithic, subset_to_tensor, evaluate_model, class_imbalance_sampler
 
 ex = Experiment("MFCC condition net with Class Imbalance")
-path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
-ex.observers.append(MongoObserver(url=path))
+# path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
+# ex.observers.append(MongoObserver(url=path))
+
+os.environ('')
 
 
 @ex.config
@@ -18,7 +21,7 @@ def cfg():
     learning_rate = 0.001
     epochs = 200
     early_stop_patience = 35
-    batch_size = 5000
+    batch_size = 500
 
 
 def logger(trainer):
@@ -35,11 +38,12 @@ def main(learning_rate, epochs, early_stop_patience, batch_size, _run):
 
     sampler = class_imbalance_sampler(train[-1], threshold=0.1)
 
-    train_loader = DataLoader(TensorDataset(*train), batch_size=batch_size, sampler=sampler, num_workers=4)
-    validation_loader = DataLoader(TensorDataset(*validation), batch_size=batch_size, num_workers=4)
+    train_loader = DataLoader(TensorDataset(*train), batch_size=batch_size, sampler=sampler)
+    validation_loader = DataLoader(TensorDataset(*validation), batch_size=batch_size)
     test_loader = DataLoader(TensorDataset(*test), batch_size=batch_size)
 
     model = ElementConditionNet()
+    model = nn.DataParallel(model)
 
     trainer = Trainer(model=model,
                       criterion=nn.BCELoss(),

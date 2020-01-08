@@ -10,65 +10,61 @@ class Trainer:
         self.criterion = criterion
         self.optimizer = optimizer
         self.epochs = epochs
-        self.callback = callback
-        self.early_stopping = EarlyStopping(early_stop_patience, early_stop_verbose)
 
-        # report state for logging callback
-        self.current_epoch = 0
-        self.training_loss = 0.
-        self.training_accuracy = 0.
-        self.validation_loss = 0.
-        self.validation_accuracy = 0.
-        self.recent_test_acc = 0.
+        self.early_stopping = EarlyStopping(early_stop_patience, verbose=True)
+        self.print_batch_interval = 20
+        self._run = _run
+        self.epoch = 0
 
     def fit(self, train_loader, val_loader):
-        for self.current_epoch in range(self.epochs):
+        for self.epoch in range(1, self.epochs - 1):
 
             self._train_step(train_loader)
-            self._validation_step(val_loader)
-            self.evaluate(val_loader)
+            validation_loss = self._validation_step(val_loader)
 
-            self.early_stopping(self.validation_loss, self.model)
+            if self.epoch % 5 == 0:
+                self.evaluate(val_loader)
+
+            self.early_stopping(validation_loss, self.model)
             if self.early_stopping.early_stop:
                 print("Early stopping")
                 break
 
-            if self.callback is not None:
-                self.callback(self)
-
     def _train_step(self, train_loader):
-        self.training_loss, self.training_accuracy = 0.0, 0.0
         self.model.train()
-        for i, (inputs, context, labels) in enumerate(train_loader):
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+        for batch_idx, (inputs, targets) in enumerate(train_loader):
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
-            loss = self.criterion(outputs, labels)
-            # print(f'outputs {outputs}')
-            # print(f'labels {labels}')
-            accuracy = self._accuracy(outputs, labels)
-            # print(f'batch accuracy {accuracy}')
-            self.training_loss += loss.item()
-            self.training_accuracy += 1 / (i + 1) * (accuracy - self.training_accuracy)
+            loss = self.criterion(outputs, targets)
             loss.backward()
             self.optimizer.step()
 
-            if (i + 1) % 10 == 0:
-                print('[epoch %d, batch %5d] loss: %.9f' %
-                      (self.current_epoch + 1, i + 1, loss / len(inputs)))
+            if batch_idx % self.print_batch_interval == 0:
+                print(f'Train Epoch {self.epoch} '
+                      f'[{batch_idx * len(inputs)}/{len(train_loader.dataset)}] '
+                      f'({100. * batch_idx / len(train_loader):.0f}%)\t'
+                      f'Loss: {loss.item():.6f}')
+
+            step = self.epoch + batch_idx / len(train_loader)
+            self._run.log_scalar('train_loss', loss.item(), step=step)
+            self._run.log_scalar('train_acc', self._accuracy(outputs, targets), step=step)
 
     def _validation_step(self, val_loader):
         self.validation_loss, self.validation_accuracy = 0.0, 0.0
         self.model.eval()
         with torch.no_grad():
-            for i, (inputs, context, labels) in enumerate(val_loader):
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+            for i, (inputs, targets) in enumerate(val_loader):
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
-                accuracy = self._accuracy(outputs, labels)
-                print(f'batch accuracy {accuracy}')
-                self.validation_loss += loss.item()
-                self.validation_accuracy += 1 / (i + 1) * (accuracy - self.validation_accuracy)
+                loss = self.criterion(outputs, targets)
+                running_loss.append(loss.item())
+                running_accuracy.append(self._accuracy(outputs, targets))
+            validation_loss = np.mean(running_loss)
+            validation_accuracy = np.mean(running_accuracy)
+            self._run.log_scalar('validation_loss', validation_loss, step=self.epoch)
+            self._run.log_scalar('validation_accuracy', validation_accuracy, step=self.epoch)
+        return validation_loss
 
     def _accuracy(self, outputs, labels):
         _, predicted = torch.max(outputs.data, 1)
