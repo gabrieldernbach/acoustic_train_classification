@@ -52,49 +52,15 @@ def cfg():
 def validation_metrcis(_run, logs):
     _run.log_scalar('val_loss', float(logs.get('val_loss')))
     _run.log_scalar('val_acc', float(logs.get('val_accuracy')))
+    _run.log_scalar('val_auc', float(logs.get('val_auc')))
+    _run.result = float(logs.get('val_auc'))
 
 
 @ex.capture
 def train_metrics(_run, logs):
     _run.log_scalar('train_loss', float(logs.get('loss')))
     _run.log_scalar('train_accuracy', float(logs.get('accuracy')))
-    _run.log_scalar('train_auc_keras', float(logs.get('auc')))
-
-
-class RocCallback(Callback):
-    def __init__(self, training_data, validation_data, _run):
-        self.x = training_data[0]
-        self.y = training_data[1] > .25
-        self.x_val = validation_data[0]
-        self.y_val = validation_data[1] > .25
-        self._run = _run
-
-    def on_train_begin(self, logs={}):
-        return
-
-    def on_train_end(self, logs={}):
-        return
-
-    def on_epoch_begin(self, epoch, logs={}):
-        return
-
-    def on_epoch_end(self, epoch, logs={}):
-        y_pred_train = self.model.predict_proba(self.x)
-        roc_train = roc_auc_score(self.y, y_pred_train)
-        y_pred_val = self.model.predict_proba(self.x_val)
-        roc_val = roc_auc_score(self.y_val, y_pred_val)
-        print('\rroc-auc_train: %s - roc-auc_val: %s' % (str(round(roc_train, 4)), str(round(roc_val, 4))),
-              end=100 * ' ' + '\n')
-        self._run.log_scalar('train_auc', float(roc_train))
-        self._run.log_scalar('validation_auc', float(roc_val))
-        self._run.result = float(roc_val)
-        return
-
-    def on_batch_begin(self, batch, logs={}):
-        return
-
-    def on_batch_end(self, batch, logs={}):
-        return
+    _run.log_scalar('train_auc', float(logs.get('auc')))
 
 
 @ex.automain
@@ -128,10 +94,13 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
         Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
         MaxPool2D(pool_size=(2, 2)),
         Dropout(rate=0.25),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu'),
         MaxPool2D(pool_size=(2, 2)),
         Dropout(rate=0.25),
         Flatten(),
+        Dense(1200, activation='relu'),
+        Dropout(rate=0.5),
         Dense(640, activation='relu'),
         Dropout(rate=0.5),
         Dense(300, activation='relu'),
@@ -143,10 +112,9 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
 
     batch_size = base_batch_size * scale_batch_rate
     lr = base_learning_rate * scale_batch_rate
-    lr_schedule = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=80, verbose=1, mode='auto',
+    lr_schedule = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=200, verbose=1, mode='auto',
                                     min_delta=0.0001, cooldown=0, min_lr=0)
     sgd = optimizers.SGD(lr=lr)
-    roc_callback = RocCallback(training_data=(x_train, y_train), validation_data=(x_test, y_test), _run=_run)
     early_stop = EarlyStopping(monitor='val_loss', min_delta=0, patience=early_stop_patience,
                                verbose=1, mode='auto', restore_best_weights=True)
 
@@ -158,7 +126,7 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
 
     model.fit(x=x_train, y=y_train, batch_size=batch_size,
               epochs=epochs, validation_data=(x_validation, y_validation),
-              callbacks=[lr_schedule, early_stop, roc_callback, LogMetrics()])
+              callbacks=[lr_schedule, early_stop, LogMetrics()])
     model.save('vgg_unbalanced.h5')
 
     validation_prediction = model.predict_proba(x_validation)
