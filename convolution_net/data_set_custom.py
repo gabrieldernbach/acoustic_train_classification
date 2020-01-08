@@ -32,6 +32,7 @@ class MelDataset(Dataset):
             inputs = self.transform(inputs)
 
         inputs = inputs.unsqueeze(0)
+        labels = labels.unsqueeze(0)
 
         return inputs, labels
 

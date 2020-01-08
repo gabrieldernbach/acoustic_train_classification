@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from efficientnet_pytorch import EfficientNet
@@ -26,9 +25,10 @@ eff_net = EfficientNet.from_name('efficientnet-b0')
 first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
 eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 1), Flatten())
 
-squeezenet = torch.hub.load('pytorch/vision:v0.4.2', 'squeezenet1_0', pretrained=True)
-first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 1, Flatten()))
+
+# squeezenet = torch.hub.load('pytorch/vision:v0.4.2', 'squeezenet1_0', pretrained=True)
+# first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
+# squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 1, Flatten()))
 
 
 class ConvBlock(nn.Module):
