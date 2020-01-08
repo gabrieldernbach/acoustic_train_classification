@@ -140,9 +140,9 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
         metrics=['accuracy']
     )
 
-    history = model.fit(x=x_train, y=y_train, batch_size=batch_size,
-                        epochs=epochs, validation_data=(x_validation, y_validation),
-                        callbacks=[early_stop, roc_callback, LogMetrics()])
+    model.fit(x=x_train, y=y_train, batch_size=batch_size,
+              epochs=epochs, validation_data=(x_validation, y_validation),
+              callbacks=[early_stop, roc_callback, LogMetrics()])
     model.save('vgg_unbalanced.h5')
 
     validation_prediction = model.predict_proba(x_validation)
