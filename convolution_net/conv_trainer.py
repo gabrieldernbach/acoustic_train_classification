@@ -4,9 +4,9 @@ import torch
 
 class Trainer:
 
-    def __init__(self, model, device, criterion, optimizer, epochs, callback, early_stop_patience, early_stop_verbose):
-        self.model = model
-        self.device = device
+    def __init__(self, model, criterion, optimizer, epochs, early_stop_patience, _run):
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.model = model.to(self.device)
         self.criterion = criterion
         self.optimizer = optimizer
         self.epochs = epochs
@@ -51,7 +51,7 @@ class Trainer:
             self._run.log_scalar('train_acc', self._accuracy(outputs, targets), step=step)
 
     def _validation_step(self, val_loader):
-        self.validation_loss, self.validation_accuracy = 0.0, 0.0
+        running_loss, running_accuracy = [], []
         self.model.eval()
         with torch.no_grad():
             for i, (inputs, targets) in enumerate(val_loader):
@@ -73,7 +73,9 @@ class Trainer:
 
 
 class EarlyStopping:
-    """Early stops the training if validation loss doesn't improve after a given patience."""
+    """
+    Early stops the training if validation loss doesn't improve after a given patience
+    """
 
     def __init__(self, patience=7, verbose=False, delta=0):
         """

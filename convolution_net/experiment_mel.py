@@ -36,8 +36,7 @@ def main(learning_rate, batch_size, epochs, early_stop_patience, _run):
     test_loader = DataLoader(MelDataset(test_path), batch_size=batch_size * 2,
                              num_workers=4, pin_memory=True)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = ResNet128.to(device)
+    model = VggNet
 
     trainer = Trainer(model=model,
                       criterion=nn.BCEWithLogitsLoss(),
