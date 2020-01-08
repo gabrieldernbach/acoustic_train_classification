@@ -114,29 +114,42 @@ if __name__ == '__main__':
         with mp.Pool(mp.cpu_count()) as p:
             station_data = p.starmap(extract_aup, project_paths)
 
-        if save_subsets:
-            # safe subset of data
-            df = pd.DataFrame(station_data, columns=['station', 'audio', 'label_vec', 'detection'])
-            print('split data')
-            train, dev, test = split(df)
-
-            print('start feature extraction')
-            train = transform(train)
-            dev = transform(dev)
-            test = transform(test)
-            df = (train, dev, test)
-            pickle.dump(df, open(f'data_monolithic_mfcc_{station}.pkl', 'wb'))
+        # if save_subsets:
+        #     # safe subset of data
+        #     df = pd.DataFrame(station_data, columns=['station', 'audio', 'label_vec', 'detection'])
+        #     print('split data')
+        #     train, validation, test = split(df)
+        #
+        #     print('start feature extraction')
+        #     train = transform(train)
+        #     validation = transform(validation)
+        #     test = transform(test)
+        #     df = (train, validation, test)
+        #     pickle.dump(df, open(f'data_monolithic_mfcc_{station}.pkl', 'wb'))
 
         data.extend(station_data)
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
     print('split data')
-    train, dev, test = split(data)
+    train, validation, test = split(data)
 
     print('start feature extraction')
-    train = transform(train)
-    dev = transform(dev)
-    test = transform(test)
-    data = (train, dev, test)
+    X_train, S_train, Y_train = transform(train)
+    X_validation, S_validation, Y_validation = transform(validation)
+    X_test, S_test, Y_test = transform(test)
+
+    print('normalize data')
+    tm = X_train.mean(axis=0)
+    ts = X_train.std(axis=0)
+
+    X_train = (X_train - tm) / ts
+    X_validation = (X_validation - tm) / ts
+    X_test = (X_test - tm) / ts
+
+    train = X_train, S_train, Y_train
+    validation = X_validation, S_validation, Y_validation
+    test = X_test, S_test, Y_test
+
+    data = (train, validation, test, (tm, ts))
     pickle.dump(data, open('data_monolithic_mfcc.pkl', 'wb'))

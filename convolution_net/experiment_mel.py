@@ -16,8 +16,10 @@ ex.observers.append(MongoObserver(url=path))
 
 @ex.config
 def cfg():
-    learning_rate = 0.1
-    epochs = 20
+    learning_rate = 0.2
+    epochs = 800
+    batch_size = 512
+    early_stop_patience = 40
 
 
 @ex.automain
@@ -38,7 +40,7 @@ def main(learning_rate, batch_size, epochs, early_stop_patience, _run):
 
     model = VggNet
 
-    trainer = Trainer(model=model,
+    trainer = Learner(model=model,
                       criterion=nn.BCEWithLogitsLoss(),
                       optimizer=optim.SGD(model.parameters(), lr=learning_rate),
                       epochs=epochs,
@@ -46,7 +48,9 @@ def main(learning_rate, batch_size, epochs, early_stop_patience, _run):
                       _run=_run, )
 
     trainer.fit(train_loader, validation_loader)
+    trainer.evaluate(validation_loader)
+    auc, f1, _ = trainer.evaluate(test_loader)
 
-    roc, f1, confmat = evaluate_model(trainer, test_loader)
+    return f'auc {auc:.3} - f1 {f1:.3}'
 
-    return f'roc {roc:.3} - f1 {f1:.3}'
+# https://pytorch.org/docs/1.1.0/_modules/torch/nn/parallel/distributed_cpu.html

@@ -8,7 +8,7 @@ import multiprocessing as mp
 import librosa
 import numpy as np
 import torch
-from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
+from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix
 from torch.utils.data import Dataset, WeightedRandomSampler
 
 
@@ -181,7 +181,6 @@ def class_imbalance_sampler(labels, threshold=0.35):
 
 def evaluate_model(model, subset):
     inputs, contexts, labels = subset
-    # predictions = F.softmax(model(inputs, contexts), dim=1)[:, 1].detach().numpy()  # multiclass
     predictions = model(inputs, contexts).detach().numpy()
     labels = labels.detach().numpy() > 0.35
     roc = roc_auc_score(labels, predictions)
@@ -205,6 +204,6 @@ if __name__ == '__main__':
     # print('test success')
 
     # test MelDataset
-    dev_path = 'mel_dev.npz'
+    dev_path = 'mel_validation.npz'
     devset = MelDataset(dev_path)
     print(devset[1])

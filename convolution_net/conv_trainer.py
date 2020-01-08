@@ -1,8 +1,9 @@
 import numpy as np
 import torch
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
 
 
-class Trainer:
+class Learner:
 
     def __init__(self, model, criterion, optimizer, epochs, early_stop_patience, _run):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -66,9 +67,31 @@ class Trainer:
             self._run.log_scalar('validation_accuracy', validation_accuracy, step=self.epoch)
         return validation_loss
 
-    def _accuracy(self, outputs, labels):
-        _, predicted = torch.max(outputs.data, 1)
-        correct = (predicted == labels).sum().item()
+    def evaluate(self, data_loader, label_threshold=0.35, prediction_threshold=0.5):
+        label_list = []
+        predictions_list = []
+
+        self.model.eval()
+        with torch.no_grad():
+            for i, (inputs, labels) in enumerate(data_loader):
+                outputs = self.model(inputs.to(self.device))
+                label_list.extend(labels.detach().numpy())
+                predictions_list.extend(outputs.detach().cpu().numpy())
+
+        labels = np.stack(label_list)
+        predictions = np.stack(predictions_list)
+
+        labels = labels > label_threshold
+        auc = roc_auc_score(labels, predictions)
+        f1 = f1_score(labels, predictions > prediction_threshold)
+        confmat = confusion_matrix(labels, predictions > prediction_threshold)
+        print(f'auc {auc:.3}, f1 {f1:.3}\n {confmat}')
+        return auc, f1, confmat
+
+    @staticmethod
+    def _accuracy(outputs, labels):
+        predictions = outputs.data > 0.5
+        correct = (predictions == labels).sum().item()
         return correct / len(labels)
 
 

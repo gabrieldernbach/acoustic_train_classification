@@ -71,7 +71,7 @@ def main(batch_size, epochs, learning_rate):
     net = ResNet224.to(device)
 
     print('start training')
-    trainer = Trainer(model=net,
+    trainer = Learner(model=net,
                       device=device,
                       criterion=nn.CrossEntropyLoss(),
                       optimizer=optim.Adam(net.parameters(), lr=learning_rate, betas=(0.9, 0.999)),
