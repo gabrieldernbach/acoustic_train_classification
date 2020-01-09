@@ -8,7 +8,7 @@ def make_model(model_name, output_bias):
     constructor_dict = {
         'ResNet50': construct_ResNet50,
         'MobileNetV2': construct_MobileNetV2,
-        'customVGG': constructor_customVgg,
+        'CustomVGG': constructor_customVgg,
     }
 
     constructor = constructor_dict[model_name]

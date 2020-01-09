@@ -9,7 +9,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callbac
 
 from keras_models import make_model
 
-ex = Experiment("atc: keras vgg no dropout")
+ex = Experiment("atc: keras adapted resnet")
 ex.captured_out_filter = apply_backspaces_and_linefeeds
 
 
@@ -30,6 +30,7 @@ metrics = [
     keras.metrics.FalsePositives(name='fp'),
     keras.metrics.TrueNegatives(name='tn'),
     keras.metrics.FalseNegatives(name='fn'),
+    keras.metrics.BinaryAccuracy(name='acc'),
     keras.metrics.Precision(name='precision'),
     keras.metrics.Recall(name='recall'),
     keras.metrics.AUC(name='auc'),
@@ -38,7 +39,7 @@ metrics = [
 
 @ex.config
 def cfg():
-    architecture = 'ResNet50'
+    architecture = 'CustomVGG'
     base_batch_size = 128
     base_learning_rate = 0.1
     scale_batch_rate = 2
@@ -49,7 +50,7 @@ def cfg():
 @ex.capture
 def validation_metrics(_run, logs):
     _run.log_scalar('val_loss', float(logs.get('val_loss')))
-    _run.log_scalar('val_acc', float(logs.get('val_accuracy')))
+    _run.log_scalar('val_acc', float(logs.get('val_acc')))
     _run.log_scalar('val_auc', float(logs.get('val_auc')))
     _run.result = f"auc={logs.get('val_auc'):.3}"
 
@@ -57,7 +58,7 @@ def validation_metrics(_run, logs):
 @ex.capture
 def train_metrics(_run, logs):
     _run.log_scalar('train_loss', float(logs.get('loss')))
-    _run.log_scalar('train_accuracy', float(logs.get('accuracy')))
+    _run.log_scalar('train_accuracy', float(logs.get('acc')))
     _run.log_scalar('train_auc', float(logs.get('auc')))
 
 
@@ -117,5 +118,4 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     print(confusion_matrix(y_test > .25, test_prediction > .35))
     return f'auc={roc_auc_score(y_test > .25, test_prediction):.3}'
 
-    # https://www.pyimagesearch.com/2019/02/04/keras-multiple-inputs-and-mixed-data/ -- for context inclusion
     # https://www.pyimagesearch.com/2019/08/05/keras-learning-rate-finder/ -- optimize training
