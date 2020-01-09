@@ -1,42 +1,66 @@
 import os
 
 import numpy as np
-import tensorflow.keras
+import tensorflow.keras as keras
 from sacred import Experiment
-from sacred.observers import MongoObserver
 from sacred.utils import apply_backspaces_and_linefeeds
 from sklearn.metrics import roc_auc_score, confusion_matrix
-from tensorflow.keras import optimizers
-from tensorflow.keras.callbacks import EarlyStopping, Callback, ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
 from tensorflow.keras.models import Sequential
 
-ex = Experiment("atc: keras vgg")
+ex = Experiment("atc: keras vgg no dropout")
 ex.captured_out_filter = apply_backspaces_and_linefeeds
 
-path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
-ex.observers.append(MongoObserver(url=path))
+
+# path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
+# ex.observers.append(MongoObserver(url=path))
 
 
-class LogMetrics(Callback):
-    def on_epoch_end(self, _, logs={}):
-        train_metrics(logs=logs)
-        validation_metrcis(logs=logs)
+def make_model(lr, output_bias):
+    if output_bias is not None:
+        output_bias = keras.initializers.Constant(output_bias)
+    model = Sequential([
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(128, 63, 1)),
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Dropout(rate=0.25),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Dropout(rate=0.25),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Dropout(rate=0.25),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Dropout(rate=0.25),
+        Flatten(),
+        Dense(640, activation='relu'),
+        Dropout(rate=0.5),
+        Dense(300, activation='relu'),
+        Dropout(rate=0.5),
+        Dense(1, activation='sigmoid', bias_initializer=output_bias)
+    ])
 
-    def on_batch_end(self, _, logs={}):
-        return
+    metrics = [
+        keras.metrics.TruePositives(name='tp'),
+        keras.metrics.FalsePositives(name='fp'),
+        keras.metrics.TrueNegatives(name='tn'),
+        keras.metrics.FalseNegatives(name='fn'),
+        keras.metrics.BinaryAccuracy(name='accuracy'),
+        keras.metrics.Precision(name='precision'),
+        keras.metrics.Recall(name='recall'),
+        keras.metrics.AUC(name='auc'),
+    ]
 
+    model.compile(
+        loss=keras.losses.BinaryCrossentropy(),
+        optimizer=keras.optimizers.Adam(lr=lr),
+        metrics=metrics)
 
-metrics = [
-    tensorflow.keras.metrics.TruePositives(name='tp'),
-    tensorflow.keras.metrics.FalsePositives(name='fp'),
-    tensorflow.keras.metrics.TrueNegatives(name='tn'),
-    tensorflow.keras.metrics.FalseNegatives(name='fn'),
-    tensorflow.keras.metrics.BinaryAccuracy(name='accuracy'),
-    tensorflow.keras.metrics.Precision(name='precision'),
-    tensorflow.keras.metrics.Recall(name='recall'),
-    tensorflow.keras.metrics.AUC(name='auc'),
-]
+    return model
 
 
 @ex.config
@@ -45,11 +69,11 @@ def cfg():
     base_learning_rate = 0.1
     scale_batch_rate = 2
     epochs = 800
-    early_stop_patience = 50
+    early_stop_patience = 150
 
 
 @ex.capture
-def validation_metrcis(_run, logs):
+def validation_metrics(_run, logs):
     _run.log_scalar('val_loss', float(logs.get('val_loss')))
     _run.log_scalar('val_acc', float(logs.get('val_accuracy')))
     _run.log_scalar('val_auc', float(logs.get('val_auc')))
@@ -77,63 +101,24 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     x_test, y_test = test['audio'], test['label']
 
     x_train = np.expand_dims(x_train, axis=-1)
-    y_train = y_train
+    y_train = y_train > 0.25
     x_validation = np.expand_dims(x_validation, axis=-1)
     x_test = np.expand_dims(x_test, axis=-1)
 
-    model = Sequential([
-        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same', input_shape=(128, 63, 1)),
-        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
-        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Flatten(),
-        Dense(1200, activation='relu'),
-        Dropout(rate=0.5),
-        Dense(640, activation='relu'),
-        Dropout(rate=0.5),
-        Dense(300, activation='relu'),
-        Dropout(rate=0.5),
-        Dense(1, activation='sigmoid')
-    ])
-
-    model.summary()
-
     batch_size = base_batch_size * scale_batch_rate
     lr = base_learning_rate * scale_batch_rate
-    lr_schedule = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=200, verbose=1, mode='auto',
+    lr_schedule = ReduceLROnPlateau(monitor='val_auc', factor=0.1, patience=100, verbose=1, mode='max',
                                     min_delta=0.0001, cooldown=0, min_lr=0)
-    sgd = optimizers.SGD(lr=lr)
-    early_stop = EarlyStopping(monitor='val_loss', min_delta=0, patience=early_stop_patience,
-                               verbose=1, mode='auto', restore_best_weights=True)
+    early_stop = EarlyStopping(monitor='val_auc', min_delta=0, patience=early_stop_patience,
+                               verbose=1, mode='max', restore_best_weights=True)
 
-    model.compile(
-        loss='binary_crossentropy',
-        optimizer=sgd,
-        metrics=metrics
-    )
+    n_true, n_false = np.bincount(y_train > 0.25)
+    model = make_model(lr=lr, output_bias=np.log(n_true / n_false))
+    model.summary()
 
     model.fit(x=x_train, y=y_train, batch_size=batch_size,
               epochs=epochs, validation_data=(x_validation, y_validation),
-              callbacks=[lr_schedule, early_stop, LogMetrics()])
+              callbacks=[lr_schedule, early_stop])
     model.save('vgg_unbalanced.h5')
 
     validation_prediction = model.predict_proba(x_validation)
