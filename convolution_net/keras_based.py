@@ -49,7 +49,6 @@ def make_model(lr, output_bias):
         keras.metrics.FalsePositives(name='fp'),
         keras.metrics.TrueNegatives(name='tn'),
         keras.metrics.FalseNegatives(name='fn'),
-        keras.metrics.BinaryAccuracy(name='accuracy'),
         keras.metrics.Precision(name='precision'),
         keras.metrics.Recall(name='recall'),
         keras.metrics.AUC(name='auc'),
@@ -101,24 +100,33 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     x_test, y_test = test['audio'], test['label']
 
     x_train = np.expand_dims(x_train, axis=-1)
-    y_train = y_train > 0.25
     x_validation = np.expand_dims(x_validation, axis=-1)
     x_test = np.expand_dims(x_test, axis=-1)
+    y_train = y_train > 0.25
+    y_validation = y_validation > 0.25
+    y_test = y_test > 0.25
 
+    n_true, n_false = np.bincount(y_train)
+    n_total = len(y_train)
+    weight_for_0 = (1 / n_false) * (n_total) / 2.0
+    weight_for_1 = (1 / n_true) * (n_total) / 2.0
+    class_weight = {0: weight_for_0, 1: weight_for_1}
     batch_size = base_batch_size * scale_batch_rate
+
     lr = base_learning_rate * scale_batch_rate
     lr_schedule = ReduceLROnPlateau(monitor='val_auc', factor=0.1, patience=100, verbose=1, mode='max',
                                     min_delta=0.0001, cooldown=0, min_lr=0)
     early_stop = EarlyStopping(monitor='val_auc', min_delta=0, patience=early_stop_patience,
                                verbose=1, mode='max', restore_best_weights=True)
 
-    n_true, n_false = np.bincount(y_train > 0.25)
+
     model = make_model(lr=lr, output_bias=np.log(n_true / n_false))
     model.summary()
 
     model.fit(x=x_train, y=y_train, batch_size=batch_size,
               epochs=epochs, validation_data=(x_validation, y_validation),
-              callbacks=[lr_schedule, early_stop])
+              callbacks=[lr_schedule, early_stop],
+              class_weight=class_weight)
     model.save('vgg_unbalanced.h5')
 
     validation_prediction = model.predict_proba(x_validation)
