@@ -5,9 +5,9 @@ import tensorflow.keras as keras
 from sacred import Experiment
 from sacred.utils import apply_backspaces_and_linefeeds
 from sklearn.metrics import roc_auc_score, confusion_matrix
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
+
+from keras_models import make_model
 
 ex = Experiment("atc: keras vgg no dropout")
 ex.captured_out_filter = apply_backspaces_and_linefeeds
@@ -16,54 +16,29 @@ ex.captured_out_filter = apply_backspaces_and_linefeeds
 # path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
 # ex.observers.append(MongoObserver(url=path))
 
+class SacredLogMetrics(Callback):
+    def on_epoch_end(self, _, logs={}):
+        train_metrics(logs=logs)
+        validation_metrics(logs=logs)
 
-def make_model(lr, output_bias):
-    if output_bias is not None:
-        output_bias = keras.initializers.Constant(output_bias)
-    model = Sequential([
-        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(128, 63, 1)),
-        Conv2D(filters=32, kernel_size=(3, 3), activation='relu'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
-        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
-        MaxPool2D(pool_size=(2, 2)),
-        Dropout(rate=0.25),
-        Flatten(),
-        Dense(640, activation='relu'),
-        Dropout(rate=0.5),
-        Dense(300, activation='relu'),
-        Dropout(rate=0.5),
-        Dense(1, activation='sigmoid', bias_initializer=output_bias)
-    ])
+    def on_batch_end(self, _, logs={}):
+        return
 
-    metrics = [
-        keras.metrics.TruePositives(name='tp'),
-        keras.metrics.FalsePositives(name='fp'),
-        keras.metrics.TrueNegatives(name='tn'),
-        keras.metrics.FalseNegatives(name='fn'),
-        keras.metrics.Precision(name='precision'),
-        keras.metrics.Recall(name='recall'),
-        keras.metrics.AUC(name='auc'),
-    ]
 
-    model.compile(
-        loss=keras.losses.BinaryCrossentropy(),
-        optimizer=keras.optimizers.Adam(lr=lr),
-        metrics=metrics)
-
-    return model
+metrics = [
+    keras.metrics.TruePositives(name='tp'),
+    keras.metrics.FalsePositives(name='fp'),
+    keras.metrics.TrueNegatives(name='tn'),
+    keras.metrics.FalseNegatives(name='fn'),
+    keras.metrics.Precision(name='precision'),
+    keras.metrics.Recall(name='recall'),
+    keras.metrics.AUC(name='auc'),
+]
 
 
 @ex.config
 def cfg():
+    architecture = 'ResNet50'
     base_batch_size = 128
     base_learning_rate = 0.1
     scale_batch_rate = 2
@@ -106,26 +81,31 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     y_validation = y_validation > 0.25
     y_test = y_test > 0.25
 
-    n_true, n_false = np.bincount(y_train)
+    n_false, n_true = np.bincount(y_train)
     n_total = len(y_train)
     weight_for_0 = (1 / n_false) * (n_total) / 2.0
     weight_for_1 = (1 / n_true) * (n_total) / 2.0
     class_weight = {0: weight_for_0, 1: weight_for_1}
-    batch_size = base_batch_size * scale_batch_rate
+    output_bias = np.log(n_true / n_false)
 
+    batch_size = base_batch_size * scale_batch_rate
     lr = base_learning_rate * scale_batch_rate
     lr_schedule = ReduceLROnPlateau(monitor='val_auc', factor=0.1, patience=100, verbose=1, mode='max',
                                     min_delta=0.0001, cooldown=0, min_lr=0)
     early_stop = EarlyStopping(monitor='val_auc', min_delta=0, patience=early_stop_patience,
                                verbose=1, mode='max', restore_best_weights=True)
 
-
-    model = make_model(lr=lr, output_bias=np.log(n_true / n_false))
+    model = make_model('ResNet50', output_bias)
     model.summary()
+
+    model.compile(
+        loss=keras.losses.BinaryCrossentropy(),
+        optimizer=keras.optimizers.Adam(lr=lr),
+        metrics=metrics)
 
     model.fit(x=x_train, y=y_train, batch_size=batch_size,
               epochs=epochs, validation_data=(x_validation, y_validation),
-              callbacks=[lr_schedule, early_stop],
+              callbacks=[lr_schedule, early_stop, SacredLogMetrics()],
               class_weight=class_weight)
     model.save('vgg_unbalanced.h5')
 
