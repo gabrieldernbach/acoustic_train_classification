@@ -4,7 +4,7 @@ from tensorflow.keras.applications import ResNet50, MobileNetV2
 from tensorflow.keras.layers import Conv2D, Dense, MaxPool2D, Dropout, Flatten
 
 
-def make_model(model_name, output_bias):
+def make_model(model_name, output_bias=None):
     constructor_dict = {
         'ResNet50': construct_ResNet50,
         'MobileNetV2': construct_MobileNetV2,

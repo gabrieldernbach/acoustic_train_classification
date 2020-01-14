@@ -82,10 +82,10 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     y_validation = y_validation > 0.25
     y_test = y_test > 0.25
 
-    n_false, n_true = np.bincount(y_train)
+    neg, pos = np.bincount(y_train)
     n_total = len(y_train)
-    weight_for_0 = (1 / n_false) * (n_total) / 2.0
-    weight_for_1 = (1 / n_true) * (n_total) / 2.0
+    weight_for_0 = (1 / neg) * (n_total) / 2.0
+    weight_for_1 = (1 / pos) * (n_total) / 2.0
     class_weight = {0: weight_for_0, 1: weight_for_1}
     output_bias = np.log(n_true / n_false)
 
