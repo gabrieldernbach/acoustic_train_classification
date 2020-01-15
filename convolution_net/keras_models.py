@@ -9,6 +9,7 @@ def make_model(model_name, output_bias=None):
         'ResNet50': construct_ResNet50,
         'MobileNetV2': construct_MobileNetV2,
         'CustomVGG': constructor_customVgg,
+        'tiny_VGG': tiny_Vgg
     }
 
     constructor = constructor_dict[model_name]
@@ -72,3 +73,29 @@ def constructor_customVgg(output_bias):
         Dense(1, activation='sigmoid', bias_initializer=output_bias)
     ])
     return model
+
+
+def tiny_Vgg(output_bias):
+    if output_bias is not None:
+        output_bias = keras.initializers.Constant(output_bias)
+    model = Sequential([
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(128, 63, 1)),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Flatten(),
+        Dense(640, activation='relu'),
+        Dense(300, activation='relu'),
+        Dense(1, activation='sigmoid', bias_initializer=output_bias)
+    ])
+    return model
+
+## dummy for model finetuning
+# base_model = ResNet18(input_shape=(224,224,3), weights='imagenet', include_top=False)
+# x = keras.layers.GlobalAveragePooling2D()(base_model.output)
+# output = keras.layers.Dense(n_classes, activation='softmax')(x)
+# model = keras.models.Model(inputs=[base_model.input], outputs=[output])

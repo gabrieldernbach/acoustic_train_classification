@@ -3,25 +3,38 @@ import os
 import numpy as np
 import tensorflow.keras as keras
 from sacred import Experiment
+from sacred.observers import MongoObserver
 from sacred.utils import apply_backspaces_and_linefeeds
 from sklearn.metrics import roc_auc_score, confusion_matrix
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
 
 from keras_models import make_model
 
-ex = Experiment("atc: keras adapted resnet")
+print('setup experiment')
+ex = Experiment("atc: keras resnet50+")
 ex.captured_out_filter = apply_backspaces_and_linefeeds
 
+print('connect to mongodb')
+path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
+ex.observers.append(MongoObserver(url=path))
 
-# path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
-# ex.observers.append(MongoObserver(url=path))
+
+@ex.config
+def cfg():
+    architecture = 'CustomVGG'
+    base_batch_size = 128
+    base_learning_rate = 0.1
+    scale_batch_rate = 2
+    epochs = 800
+    early_stop_patience = 150
+
 
 class SacredLogMetrics(Callback):
     def on_epoch_end(self, _, logs={}):
-        train_metrics(logs=logs)
         validation_metrics(logs=logs)
 
     def on_batch_end(self, _, logs={}):
+        train_metrics(logs=logs)
         return
 
 
@@ -36,15 +49,6 @@ metrics = [
     keras.metrics.AUC(name='auc'),
 ]
 
-
-@ex.config
-def cfg():
-    architecture = 'CustomVGG'
-    base_batch_size = 128
-    base_learning_rate = 0.1
-    scale_batch_rate = 2
-    epochs = 800
-    early_stop_patience = 150
 
 
 @ex.capture
@@ -62,8 +66,31 @@ def train_metrics(_run, logs):
     _run.log_scalar('train_auc', float(logs.get('auc')))
 
 
+class Normalize:
+    def __init__(self):
+        self.xm = np.array([])
+        self.xv = np.array([])
+
+    def fit(self, data):
+        self.xm = data.mean(axis=0)
+        self.xv = data.var(axis=0)
+        return self.xm, self.xv
+
+    def transform(self, data):
+        data = data - self.xm[None, :, :]
+        data = data / self.xv[None, :, :]
+        return data
+
+    def fit_transform(self, data):
+        self.fit(data)
+        data = self.transform(data)
+        return data
+
+
 @ex.automain
-def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_stop_patience, _run):
+def main(architecture, base_batch_size,
+         base_learning_rate, scale_batch_rate,
+         epochs, early_stop_patience, _run):
     files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
@@ -74,6 +101,19 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     x_train, y_train = train['audio'], train['label']
     x_validation, y_validation = validation['audio'], validation['label']
     x_test, y_test = test['audio'], test['label']
+
+    norm = Normalize()
+    x_train = norm.fit_transform(np.log(x_train))
+    x_validation = norm.transform(np.log(x_validation))
+    x_test = norm.transform(np.log(x_test))
+
+    # import matplotlib.pyplot as plt
+    # idx = np.where(y_train == 1)[0]
+    # for i in idx:
+    #     plt.imshow(x_train[i, :, :])
+    #     plt.show()
+    #
+    # exit()
 
     x_train = np.expand_dims(x_train, axis=-1)
     x_validation = np.expand_dims(x_validation, axis=-1)
@@ -87,16 +127,16 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
     weight_for_0 = (1 / neg) * (n_total) / 2.0
     weight_for_1 = (1 / pos) * (n_total) / 2.0
     class_weight = {0: weight_for_0, 1: weight_for_1}
-    output_bias = np.log(n_true / n_false)
+    output_bias = np.log(neg / pos)
 
     batch_size = base_batch_size * scale_batch_rate
     lr = base_learning_rate * scale_batch_rate
-    lr_schedule = ReduceLROnPlateau(monitor='val_auc', factor=0.1, patience=100, verbose=1, mode='max',
+    lr_schedule = ReduceLROnPlateau(monitor='auc', factor=0.1, patience=100, verbose=1, mode='max',
                                     min_delta=0.0001, cooldown=0, min_lr=0)
-    early_stop = EarlyStopping(monitor='val_auc', min_delta=0, patience=early_stop_patience,
+    early_stop = EarlyStopping(monitor='auc', min_delta=0, patience=early_stop_patience,
                                verbose=1, mode='max', restore_best_weights=True)
 
-    model = make_model('ResNet50', output_bias)
+    model = make_model(architecture, output_bias)
     model.summary()
 
     model.compile(
@@ -108,7 +148,7 @@ def main(base_batch_size, base_learning_rate, scale_batch_rate, epochs, early_st
               epochs=epochs, validation_data=(x_validation, y_validation),
               callbacks=[lr_schedule, early_stop, SacredLogMetrics()],
               class_weight=class_weight)
-    model.save('vgg_unbalanced.h5')
+    model.save('vgg_balanced.h5')
 
     validation_prediction = model.predict_proba(x_validation)
     print(roc_auc_score(y_validation > .25, validation_prediction))
