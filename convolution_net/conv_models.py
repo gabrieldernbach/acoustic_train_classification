@@ -1,164 +1,165 @@
-import torch.nn as nn
-import torch.nn.functional as F
-from efficientnet_pytorch import EfficientNet
+import tensorflow
+from sklearn.metrics import roc_auc_score
+from tensorflow.keras import Sequential
+from tensorflow.keras.applications import ResNet50, MobileNetV2
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.layers import Conv2D, Dense, MaxPool2D, Flatten, GlobalAvgPool2D, BatchNormalization
 
 
-class Flatten(nn.Module):
-    def forward(self, input):
-        # return input.squeeze()
-        return input.view(input.size(0), -1)
+def make_model(model_name):
+    constructor_dict = {
+        'ResNet50': construct_ResNet50,
+        'MobileNetV2': construct_MobileNetV2,
+        'CustomVGG': constructor_customVgg,
+        'tiny_VGG': tiny_Vgg
+    }
+
+    constructor = constructor_dict[model_name]
+    model = constructor()
+    return model
 
 
-"""
-Modified Efficient Net (Key Feature : Scalability)
-The network was originally specified for imagenet which
-takes 3 x 224 x 224 images as inputs and predicts 1000 classes.
+def construct_ResNet50():
+    resnet50 = ResNet50(include_top=True, input_shape=(128, 63, 3), classes=10, weights=None)
 
-The input resolution of the spectrograms is adapted by resizing.
-Input channels get expanded by prepending an additional convolutional layer that project to 3 channels
-For the outputs we prepend one fully connected layer mapping to 1000 nodes to 1.
-"""
-eff_net = EfficientNet.from_name('efficientnet-b0')
-first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-eff_net = nn.Sequential(first_conv_layer, eff_net, nn.Linear(1000, 1), Flatten())
+    model = Sequential()
+    model.add(Conv2D(filters=3, kernel_size=3, padding='same', activation='relu',
+                     input_shape=(128, 63, 1)))
+    model.add(resnet50)
+    model.add(Dense(1, activation='sigmoid'))
+
+    return model
 
 
-# squeezenet = torch.hub.load('pytorch/vision:v0.4.2', 'squeezenet1_0', pretrained=True)
-# first_conv_layer = nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True)
-# squeezenet = nn.Sequential(first_conv_layer, squeezenet, nn.Linear(1000, 1, Flatten()))
+def construct_MobileNetV2():
+    mobilenet = MobileNetV2(input_shape=(128, 63, 3), alpha=1.0, include_top=True, weights=None,
+                            input_tensor=None, pooling=None, classes=10)
+
+    model = Sequential()
+    model.add(Conv2D(filters=3, kernel_size=3, padding='same', activation='relu',
+                     input_shape=(128, 63, 1)))
+    model.add(mobilenet)
+    model.add(Dense(1, activation='sigmoid'))
+
+    return model
 
 
-class ConvBlock(nn.Module):
-    """
-    Convolution - Batchnorm - ReLU Layer
-    that halves the input shape by default e.g 32x32 to 16x16.
-    to remain at same size, use stride=1
-    """
+def constructor_customVgg():
+    model = Sequential([
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', padding='same', input_shape=(128, 63, 1)),
+        BatchNormalization(),
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        MaxPool2D(pool_size=(2, 2)),
+        # Dropout(rate=0.25),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'),  # 63, 32
+        BatchNormalization(),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        MaxPool2D(pool_size=(2, 2)),
+        # Dropout(rate=0.25),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),  # 32, 16
+        BatchNormalization(),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        MaxPool2D(pool_size=(2, 2)),
+        # Dropout(rate=0.25),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),  # 16, 8
+        BatchNormalization(),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),  # 8, 4
+        BatchNormalization(),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),  # 4, 2
+        BatchNormalization(),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding='same'),
+        BatchNormalization(),
+        GlobalAvgPool2D(),
+        # Dropout(rate=0.25),
+        Flatten(),
+        Dense(640, activation='relu'),
+        BatchNormalization(),
+        # Dropout(rate=0.5),
+        Dense(300, activation='relu'),
+        BatchNormalization(),
+        # Dropout(rate=0.5),
+        Dense(1, activation='sigmoid')
+    ])
+    return model
 
-    def __init__(self, ni, nf, stride=1):
-        super().__init__()
-        self.conv = nn.Conv2d(ni, nf, kernel_size=3, stride=stride, padding=1)
-        self.bn = nn.BatchNorm2d(nf)
 
-    def forward(self, x):
-        return F.relu(self.bn(self.conv(x)))
-
-
-class ResBlock(nn.Module):
-    """
-    classical residual block
-    """
-
-    def __init__(self, ni, nf, stride=1):
-        super(ResBlock, self).__init__()
-        self.conv1 = nn.Conv2d(ni, nf, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(nf)
-        self.conv2 = nn.Conv2d(nf, nf, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(nf)
-
-        if stride != 1 or ni != nf:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(ni, nf, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(nf)
-            )
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x) if hasattr(self, 'shortcut') else x
-        out = F.relu(out)
-        return out
+def tiny_Vgg():
+    model = Sequential([
+        Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=(128, 63, 1)),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Conv2D(filters=128, kernel_size=(3, 3), activation='relu'),
+        MaxPool2D(pool_size=(2, 2)),
+        Flatten(),
+        Dense(640, activation='relu'),
+        Dense(300, activation='relu'),
+        Dense(1, activation='sigmoid')
+    ])
+    return model
 
 
-VggNet = nn.Sequential(  # beginning shape 128 x 63
-    nn.Conv2d(1, 32, 3),
-    nn.ReLU(inplace=True),
-    nn.Conv2d(32, 32, 3),
-    nn.ReLU(inplace=True),
-    nn.MaxPool2d(2, 2),
-    nn.Dropout2d(0.25),
+## dummy for inhereting model
+# base_model = ResNet18(input_shape=(224,224,3), weights='imagenet', include_top=False)
+# x = keras.layers.GlobalAveragePooling2D()(base_model.output)
+# output = keras.layers.Dense(n_classes, activation='softmax')(x)
+# model = keras.models.Model(inputs=[base_model.input], outputs=[output])
 
-    nn.Conv2d(32, 64, 3),
-    nn.ReLU(inplace=True),
-    nn.Conv2d(64, 64, 3),
-    nn.ReLU(inplace=True),
-    nn.MaxPool2d(2, 2),
-    nn.Dropout2d(0.25),
 
-    nn.Conv2d(64, 128, 3),
-    nn.ReLU(inplace=True),
-    nn.Conv2d(128, 128, 3),
-    nn.ReLU(inplace=True),
-    nn.MaxPool2d(2, 2),
-    nn.Dropout2d(0.25),
+# Model Metrics
 
-    nn.Conv2d(128, 128, 3),
-    nn.ReLU(inplace=True),
-    nn.MaxPool2d(2, 2),
-    nn.Dropout2d(0.25),
-    Flatten(),
+metrics = [
+    tensorflow.keras.metrics.TruePositives(name='tp'),
+    tensorflow.keras.metrics.FalsePositives(name='fp'),
+    tensorflow.keras.metrics.TrueNegatives(name='tn'),
+    tensorflow.keras.metrics.FalseNegatives(name='fn'),
+    tensorflow.keras.metrics.BinaryAccuracy(name='accuracy'),
+    tensorflow.keras.metrics.Precision(name='precision'),
+    tensorflow.keras.metrics.Recall(name='recall'),
+    tensorflow.keras.metrics.AUC(name='auc'),
+]
 
-    nn.Linear(640, 640),
-    nn.ReLU(inplace=True),
-    nn.Dropout(0.5),
-    nn.Linear(640, 300),
-    nn.ReLU(inplace=True),
-    nn.Dropout(0.5),
-    nn.Linear(300, 1),
-    nn.Sigmoid(),
 
-)
+class RocCallback(Callback):
+    def __init__(self, training_data, validation_data, _run):
+        super(RocCallback, self).__init__()
+        self.x = training_data[0]
+        self.y = training_data[1] > .25
+        self.x_val = validation_data[0]
+        self.y_val = validation_data[1] > .25
+        self._run = _run
 
-ResNet224 = nn.Sequential(  # beginning shape 224
-    ConvBlock(1, 64, stride=2),  # remaining shape 122
-    ResBlock(64, 64),
-    ResBlock(64, 64),
-    ResBlock(64, 128, stride=2),  # 61
-    ResBlock(128, 128),
-    ResBlock(128, 128),
-    ResBlock(128, 256, stride=2),  # 31
-    ResBlock(256, 256),
-    ResBlock(256, 256),
-    ResBlock(256, 512, stride=2),  # 16
-    ResBlock(512, 512),
-    ResBlock(512, 512),
-    ResBlock(512, 512, stride=2),  # 8
-    ResBlock(512, 512),
-    ResBlock(512, 512),
-    ResBlock(512, 512, stride=2),  # 4
-    ResBlock(512, 512),
-    ResBlock(512, 512),
-    ResBlock(512, 512, stride=2),  # 2
-    ResBlock(512, 512),
-    ResBlock(512, 512),
-    ConvBlock(512, 256, stride=2),  # 1
-    ConvBlock(256, 128),
-    ConvBlock(128, 64),
-    ConvBlock(64, 32),
-    ConvBlock(32, 1),
-    Flatten()
-)
-
-ResNet128 = nn.Sequential(  # input shape 128, 63
-    ConvBlock(1, 32, stride=2),  # remaining shape 64, 32
-    # ResBlock(32, 32),
-    # ResBlock(32, 32),
-    ResBlock(32, 64, stride=2),  # 32, 16
-    # ResBlock(64, 64),
-    # ResBlock(64, 64),
-    ResBlock(64, 128, stride=2),  # 16, 8
-    # ResBlock(128, 128),
-    # ResBlock(128, 128),
-    ResBlock(128, 256, stride=2),  # 8, 4
-    # ResBlock(256, 256),
-    # ResBlock(256, 256),
-    ResBlock(256, 512, stride=2),  # 4, 2
-    # ResBlock(512, 512),
-    # ResBlock(512, 512),
-    ResBlock(512, 512, stride=2),  # 4, 2
-    ResBlock(512, 512, stride=2),  # 2, 1
-    ResBlock(512, 512, stride=2),  # 1, 1
-    ResBlock(512, 256),
-    ConvBlock(256, 1),
-    Flatten(),
-)
+    def on_epoch_end(self, epoch, logs={}):
+        y_pred_train = self.model.predict_proba(self.x)
+        roc_train = roc_auc_score(self.y, y_pred_train)
+        y_pred_val = self.model.predict_proba(self.x_val)
+        roc_val = roc_auc_score(self.y_val, y_pred_val)
+        print('\rroc-auc_train: %s - roc-auc_val: %s' % (str(round(roc_train, 4)), str(round(roc_val, 4))),
+              end=100 * ' ' + '\n')
+        self._run.log_scalar('train_auc', float(roc_train))
+        self._run.log_scalar('validation_auc', float(roc_val))
+        self._run.result = float(roc_val)
+        return

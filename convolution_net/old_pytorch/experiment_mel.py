@@ -5,9 +5,9 @@ import torch.optim as optim
 from sacred import Experiment
 from torch.utils.data import DataLoader
 
-from conv_models import VggNet
-from conv_trainer import Learner
-from data_set_custom import MelDataset, class_imbalance_sampler
+from old_pytorch.conv_models import VggNet
+from old_pytorch.conv_trainer import Learner
+from old_pytorch.data_set_custom import MelDataset, class_imbalance_sampler
 
 ex = Experiment("atc: VGG pytorch")
 

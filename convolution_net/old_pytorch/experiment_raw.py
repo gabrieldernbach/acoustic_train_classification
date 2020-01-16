@@ -7,10 +7,10 @@ from sacred import Experiment
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import transforms
 
-from convolution_net.conv_models import ResNet224
-from convolution_net.conv_trainer import Learner
-from convolution_net.data_augmentations import Resize, MelSpectrogram
-from convolution_net.data_set_custom import RawDataset, split, balancing_sample_weights
+from old_pytorch.conv_models import ResNet224
+from old_pytorch.conv_trainer import Learner
+from old_pytorch.data_augmentations import Resize, MelSpectrogram
+from old_pytorch.data_set_custom import RawDataset, split, balancing_sample_weights
 
 ex = Experiment("OnMel")
 
@@ -37,7 +37,7 @@ def logger(trainer, _run):
 @ex.main
 def main(batch_size, epochs, learning_rate):
     print('read data set')
-    data_register = pickle.load(open('../data/data_register.pkl', 'rb'))
+    data_register = pickle.load(open('../../data/data_register.pkl', 'rb'))
     # data_register = data_register.sample(n=150).reset_index(drop=True)
     train, validation, test = split(data_register)
 

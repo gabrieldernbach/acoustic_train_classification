@@ -204,6 +204,6 @@ if __name__ == '__main__':
     # print('test success')
 
     # test MelDataset
-    dev_path = 'mel_validation.npz'
+    dev_path = '../mel_validation.npz'
     devset = MelDataset(dev_path)
     print(devset[1])

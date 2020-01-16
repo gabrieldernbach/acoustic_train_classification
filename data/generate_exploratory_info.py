@@ -1,6 +1,6 @@
 """
 Generate exploratory information about the provided dataset,
-such as how many files, their play time, and the extend to which we can find labels.
+such as how many files, their play time, and the extent to which we can find labels.
 """
 
 import os
