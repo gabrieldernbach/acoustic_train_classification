@@ -1,8 +1,6 @@
 import os
 
 import numpy as np
-import tensorflow
-import tensorflow.keras
 from sacred import Experiment
 from sklearn.metrics import roc_auc_score, confusion_matrix
 from tensorflow.keras import optimizers
@@ -46,12 +44,6 @@ def train_metrics(_run, logs):
     _run.log_scalar('train_loss', float(logs.get('loss')))
     _run.log_scalar('train_accuracy', float(logs.get('accuracy')))
     _run.log_scalar('train_auc_keras', float(logs.get('auc')))
-
-def make_ds(features, labels):
-    ds = tensorflow.data.Dataset.from_tensor_slices((features, labels))
-    ds = ds.shuffle(buffer_size=100_000).repeat()
-    return ds
-
 
 @ex.automain
 def main(model_name, batch_size, learning_rate,

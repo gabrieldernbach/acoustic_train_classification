@@ -10,10 +10,49 @@ import librosa
 import numpy as np
 import pandas as pd
 from librosa.util import frame
+from torch import tensor
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 
+def fetch_balanced_dataloaders():
+    files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
+    path = os.path.dirname(os.path.realpath(__file__))
+    train_path, validation_path, test_path = [path + s for s in files]
+
+    train = np.load(train_path, allow_pickle=True)
+    validation = np.load(validation_path, allow_pickle=True)
+    test = np.load(test_path, allow_pickle=True)
+    x_train, y_train = train['audio'], train['label']
+    x_validation, y_validation = validation['audio'], validation['label']
+    x_test, y_test = test['audio'], test['label']
+
+    # reshape for convolution
+    x_train = np.expand_dims(x_train, axis=1)
+    x_validation = np.expand_dims(x_validation, axis=1)
+    x_test = np.expand_dims(x_test, axis=1)
+    y_train = np.expand_dims(y_train, axis=-1)
+    y_validation = np.expand_dims(y_validation, axis=-1)
+    y_test = np.expand_dims(y_test, axis=-1)
+
+    x_train, y_train = upsample_minority(x_train, y_train, y_threshold=0.125)
+    print(sum(y_train > 0.125), len(y_train))
+    print(sum(y_validation > 0.125), len(y_validation))
+    print(x_train.shape)
+
+    dl_args = {'batch_size': 256, 'shuffle': True, 'num_workers': 1, 'pin_memory': True}
+    train_dl = DataLoader(TensorDataset(tensor(x_train), tensor(y_train).float()), **dl_args)
+    validation_dl = DataLoader(TensorDataset(tensor(x_validation), tensor(y_validation).float()), **dl_args)
+    test_dl = DataLoader(TensorDataset(tensor(x_test), tensor(y_test).float()), **dl_args)
+    return train_dl, validation_dl, test_dl
+
+
 class Normalizer:
+    """
+    computes and stores global mean and variance for a set of ndarrays.
+    The dimensions are assumed as instance x height x length
+    """
+
     def __init__(self):
         self.xm = np.array([])
         self.xv = np.array([])
@@ -34,12 +73,33 @@ class Normalizer:
         return data
 
 
-# oversample minority class
-def upsample_minority(x_train, y_train):
-    pos_features = x_train[np.where(y_train > 0.25)[0]]
-    neg_features = x_train[np.where(y_train < 0.25)[0]]
-    pos_labels = y_train[np.where(y_train > 0.25)[0]]
-    neg_labels = y_train[np.where(y_train < 0.25)[0]]
+def split(data, a=0.6, b=0.8):
+    """
+    Create a random train, validation, test split of a pandas data frame
+    """
+    a, b = int(a * len(data)), int(b * len(data))
+    data_shuffled = data.sample(frac=1, random_state=1).reset_index(drop=True)
+    train, validation, test = np.split(data_shuffled, [a, b])
+    validation.reset_index(inplace=True, drop=True)
+    test.reset_index(inplace=True, drop=True)
+    return train, validation, test
+
+
+def upsample_minority(x_train, y_train, y_threshold=0.25):
+    """
+    For binary classification returns a balanced dataset
+    by repeatedly sampling from the minority class.
+    For soft labels provide a split point y_threshold
+
+    :param x_train: ndarray
+    :param y_train: ndarray
+    :param y_threshold: float
+    :return: reampled_features, resampled_labels
+    """
+    pos_features = x_train[np.where(y_train > y_threshold)[0]]
+    neg_features = x_train[np.where(y_train < y_threshold)[0]]
+    pos_labels = y_train[np.where(y_train > y_threshold)[0]]
+    neg_labels = y_train[np.where(y_train < y_threshold)[0]]
 
     ids = np.arange(len(pos_features))
     choices = np.random.choice(ids, len(neg_features))
@@ -55,19 +115,7 @@ def upsample_minority(x_train, y_train):
     return resampled_features, resampled_labels
 
 
-def split(data, a=0.6, b=0.8):
-    """
-    Create a random train, validation, test split of a pandas data frame
-    """
-    a, b = int(a * len(data)), int(b * len(data))
-    data_shuffled = data.sample(frac=1, random_state=1).reset_index(drop=True)
-    train, validation, test = np.split(data_shuffled, [a, b])
-    validation.reset_index(inplace=True, drop=True)
-    test.reset_index(inplace=True, drop=True)
-    return train, validation, test
 
-
-## methods to extract feature representation from raw data
 def mark_to_vec(marks_in_s, len_sequence):
     """
     convert the marks ins seconds into a time series label vector
@@ -119,7 +167,7 @@ def stmt(x):
     """
     returns the normalized log short term mel spectrogram transformation of signal vector x
     """
-    x = librosa.feature.melspectrogram(x, sr=SAMPLE_RATE, n_fft=512, hop_length=128, n_mels=N_MELS)
+    x = librosa.feature.melspectrogram(x, sr=SAMPLE_RATE, n_fft=512, hop_length=STFT_HOP_LENGTH, n_mels=N_MELS)
     x = np.log(x + 1e-12)
     return x
 
@@ -139,16 +187,16 @@ def transform(dataset):
     X = np.stack(X)
     S = np.concatenate(S, axis=-1).T[:, 0]
     Y = np.concatenate(Y, axis=-1)
-    Y = (Y.sum(axis=0) / SAMPLE_RATE)
+    Y = Y.mean(axis=0)
 
     return X, S, Y
 
 
 if __name__ == '__main__':
-    SAMPLE_RATE = 48_000
-    FRAME_LENGTH = 96_000
-    FRAME_HOP_LENGTH = 12_000
-    STFT_HOP_LENGTH = 1024
+    SAMPLE_RATE = 8_000  # 48_000
+    FRAME_LENGTH = 16_000  # 96_000
+    FRAME_HOP_LENGTH = 2_000  # 12_000
+    STFT_HOP_LENGTH = 128  # 1024
     N_MELS = 40
 
     root = os.path.abspath('../data/')
@@ -173,14 +221,18 @@ if __name__ == '__main__':
     data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
     print('split data')
     train, validation, test = split(data)
+    del data
 
     print('start feature extraction')
     normalizer = Normalizer()
     X_train, S_train, Y_train = transform(train)
+    del train
     X_train = normalizer.fit_transform(X_train)
     X_validation, S_validation, Y_validation = transform(validation)
+    del validation
     X_validation = normalizer.transform(X_validation)
     X_test, S_test, Y_test = transform(test)
+    del test
     X_test = normalizer.transform(X_test)
 
     np.savez('mel_train.npz',
