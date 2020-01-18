@@ -9,13 +9,14 @@ from typing import List, Tuple
 import librosa
 import numpy as np
 import pandas as pd
+import torch
 from librosa.util import frame
 from torch import tensor
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 
-def fetch_balanced_dataloaders():
+def fetch_balanced_dataloaders(batch_size=64):
     files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
@@ -31,19 +32,26 @@ def fetch_balanced_dataloaders():
     x_train = np.expand_dims(x_train, axis=1)
     x_validation = np.expand_dims(x_validation, axis=1)
     x_test = np.expand_dims(x_test, axis=1)
-    y_train = np.expand_dims(y_train, axis=-1)
-    y_validation = np.expand_dims(y_validation, axis=-1)
-    y_test = np.expand_dims(y_test, axis=-1)
+    y_train = (np.expand_dims(y_train, axis=-1) > 0.125).astype(float)
+    y_validation = (np.expand_dims(y_validation, axis=-1) > 0.125).astype(float)
+    y_test = (np.expand_dims(y_test, axis=-1) > 0.125).astype(float)
 
     x_train, y_train = upsample_minority(x_train, y_train, y_threshold=0.125)
     print(sum(y_train > 0.125), len(y_train))
     print(sum(y_validation > 0.125), len(y_validation))
     print(x_train.shape)
 
-    dl_args = {'batch_size': 256, 'shuffle': True, 'num_workers': 1, 'pin_memory': True}
+    dl_args = {'batch_size': batch_size, 'shuffle': True, 'num_workers': 4, 'pin_memory': True}
     train_dl = DataLoader(TensorDataset(tensor(x_train), tensor(y_train).float()), **dl_args)
     validation_dl = DataLoader(TensorDataset(tensor(x_validation), tensor(y_validation).float()), **dl_args)
     test_dl = DataLoader(TensorDataset(tensor(x_test), tensor(y_test).float()), **dl_args)
+    return train_dl, validation_dl, test_dl
+
+
+def fetch_dummy_dataloader():
+    train_dl = DataLoader(TensorDataset(torch.randn(200, 1, 40, 126), torch.rand(200, 1)), batch_size=5)
+    validation_dl = DataLoader(TensorDataset(torch.randn(200, 1, 40, 126), torch.rand(200, 1)), batch_size=5)
+    test_dl = DataLoader(TensorDataset(torch.randn(200, 1, 40, 126), torch.rand(200, 1)), batch_size=5)
     return train_dl, validation_dl, test_dl
 
 
