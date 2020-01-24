@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 
-def fetch_balanced_dataloaders(batch_size=64):
+def fetch_balanced_dataloaders(batch_size=64, soft_labels=True):
     files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
@@ -32,9 +32,15 @@ def fetch_balanced_dataloaders(batch_size=64):
     x_train = np.expand_dims(x_train, axis=1)
     x_validation = np.expand_dims(x_validation, axis=1)
     x_test = np.expand_dims(x_test, axis=1)
-    y_train = (np.expand_dims(y_train, axis=-1) > 0.125).astype(float)
-    y_validation = (np.expand_dims(y_validation, axis=-1) > 0.125).astype(float)
-    y_test = (np.expand_dims(y_test, axis=-1) > 0.125).astype(float)
+
+    if soft_labels:
+        y_train = np.expand_dims(y_train, axis=-1)
+        y_validation = np.expand_dims(y_validation, axis=-1)
+        y_test = np.expand_dims(y_test, axis=-1)
+    else:
+        y_train = (np.expand_dims(y_train, axis=-1) > 0.125).astype(float)
+        y_validation = (np.expand_dims(y_validation, axis=-1) > 0.125).astype(float)
+        y_test = (np.expand_dims(y_test, axis=-1) > 0.125).astype(float)
 
     x_train, y_train = upsample_minority(x_train, y_train, y_threshold=0.125)
     print(sum(y_train > 0.125), len(y_train))

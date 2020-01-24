@@ -81,6 +81,60 @@ CustomVGG_tiny = nn.Sequential(
     nn.Sigmoid(),
 )
 
+
+class ConvBlock(nn.Module):
+    """
+    Convolution - Batchnorm - ReLU Layer
+    that halves the input shape by default e.g 32x32 to 16x16.
+    to remain at same size, use stride=1
+    """
+
+    def __init__(self, ni, nf, stride=1):
+        super().__init__()
+        self.conv = nn.Conv2d(ni, nf, kernel_size=3, stride=stride, padding=1)
+        self.bn = nn.BatchNorm2d(nf)
+
+    def forward(self, x):
+        return F.relu(self.bn(self.conv(x)))
+
+
+class ResBlock(nn.Module):
+    """
+    classical residual block
+    """
+
+    def __init__(self, ni, nf, stride=1):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(ni, nf, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(nf)
+        self.conv2 = nn.Conv2d(nf, nf, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(nf)
+
+        if stride != 1 or ni != nf:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(ni, nf, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(nf)
+            )
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x) if hasattr(self, 'shortcut') else x
+        out = F.relu(out)
+        return out
+
+
+ResNet128 = nn.Sequential(  # input shape 40, 126
+    ConvBlock(1, 32, stride=2),  # remaining shape 20, 63
+    ResBlock(32, 64, stride=2),  # 10, 31
+    ResBlock(64, 128, stride=2),  # 5, 15
+    ResBlock(128, 256, stride=2),  # 2, 7
+    ResBlock(256, 512, stride=2),  # 1, 3
+    nn.AdaptiveMaxPool2d(1),
+    nn.Linear(512, 1),
+    nn.Sigmoid()
+)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

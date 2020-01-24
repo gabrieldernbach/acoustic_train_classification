@@ -18,9 +18,9 @@ class Learner:
     def fit(self, train_loader, validation_loader, epochs):
         for self.epoch in range(epochs):
             self.train(train_loader)
-            aps = self.validate(validation_loader)
+            f1 = self.validate(validation_loader)
 
-            self.scheduler.step(aps)
+            self.scheduler.step(f1)
 
     def train(self, data_loader):
         outs_collect = []
@@ -53,7 +53,6 @@ class Learner:
                 self.model.eval()
                 outs = self.model(samples)
                 loss = self.criterion(outs, targets)
-                per = (i + 1) / len(data_loader)
 
                 loss_collected.append(loss.item())
                 outs_collect.append(outs.detach().cpu().numpy())
@@ -61,8 +60,8 @@ class Learner:
 
             mean_loss = np.array(loss_collected).mean()
             self.db_observer.log_scalar('validation_loss', mean_loss, step=self.epoch)
-            aps = self.metrics('val', outs_collect, targets_collect)
-            return aps
+            f1 = self.metrics('val', outs_collect, targets_collect)
+            return f1
 
     def mixup(self, samples, targets, alpha=0.8):
         idx = torch.randperm(samples.size(0))
@@ -96,7 +95,13 @@ class Learner:
         print(f'{mode:5} - tp:{tp:5}, fp:{fp:5}, tn:{tn:5}, fn:{fn:5}, '
               f'precision:{precision:5.2}, recall:{recall:5.2}, f1:{f1:5.2}, '
               f'acc:{acc:5.2}, auc:{auc:5.2}, aps:{aps:5.2}')
+
+        # write to mongo db
         self.db_observer.log_scalar(f'{mode}_f1', f1, step=self.epoch)
         self.db_observer.log_scalar(f'{mode}_auc', auc, step=self.epoch)
         self.db_observer.log_scalar(f'{mode}_aps', aps, step=self.epoch)
+        self.db_observer.log_scalar(f'{mode}_tp', tp, step=self.epoch)
+        self.db_observer.log_scalar(f'{mode}_fp', fp, step=self.epoch)
+        self.db_observer.log_scalar(f'{mode}_fn', fn, step=self.epoch)
+        self.db_observer.log_scalar(f'{mode}_tn', tn, step=self.epoch)
         return aps
