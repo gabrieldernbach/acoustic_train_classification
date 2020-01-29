@@ -33,10 +33,10 @@ def extract_aup(aup_path, data_path, station, verbose=1):
 
     # load wave file
     xml_wave = r'{http://audacity.sourceforge.net/xml/}wavetrack'
-    name = root.find(xml_wave).attrib['name'] + '.wav'
+    name = root.find(xml_wave).attrib['name']
     if verbose > 0:
         print(f'extracting data point {name}')
-    audio_path = f'{data_path}/{name}'
+    audio_path = f'{data_path}/{name}.wav'
 
     # extract labels
     xml_label = r'{http://audacity.sourceforge.net/xml/}label'
@@ -47,7 +47,13 @@ def extract_aup(aup_path, data_path, station, verbose=1):
         marks.append((start, end))
     detection = (len(marks) > 0)
 
-    return station, audio_path, marks, detection
+    # extract speed
+    path_csv = f'{data_path}/{name}.csv'
+    file = pd.read_csv(path_csv, sep=';', decimal=',', dtype=np.float32)
+    speeds = file.speedInMeterPerSeconds
+    speed_kmh = (speeds * 3.6).mean()
+
+    return station, audio_path, marks, detection, speed_kmh
 
 
 if __name__ == '__main__':
@@ -71,7 +77,7 @@ if __name__ == '__main__':
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio_path',
-                                       'label', 'detection'])
+                                       'label', 'detection', 'speed_kmh'])
     print('safe file to "data_register.pkl"')
     data.to_pickle('data_register.pkl')
 

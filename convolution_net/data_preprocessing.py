@@ -3,48 +3,35 @@ Save dataset under mel spectrogram transformation for convolutional network
 """
 import multiprocessing as mp
 import os
-import xml.etree.ElementTree as ElementTree
-from typing import List, Tuple
+import pickle
 
 import librosa
 import numpy as np
-import pandas as pd
 import torch
-from librosa.util import frame
 from torch import tensor
 from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
 
 
-def fetch_balanced_dataloaders(batch_size=64, soft_labels=True):
-    files = '/mel_train.npz', '/mel_validation.npz', '/mel_test.npz'
+def fetch_balanced_dataloaders(batch_size=256, label_threshold=0.125):
+    files = '/data_train.npz', '/data_validation.npz', '/data_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
 
     train = np.load(train_path, allow_pickle=True)
     validation = np.load(validation_path, allow_pickle=True)
     test = np.load(test_path, allow_pickle=True)
-    x_train, y_train = train['audio'], train['label']
-    x_validation, y_validation = validation['audio'], validation['label']
-    x_test, y_test = test['audio'], test['label']
+    x_train, y_train = train['audio'], train['target']
+    x_validation, y_validation = validation['audio'], validation['target']
+    x_test, y_test = test['audio'], test['target']
 
     # reshape for convolution
     x_train = np.expand_dims(x_train, axis=1)
     x_validation = np.expand_dims(x_validation, axis=1)
     x_test = np.expand_dims(x_test, axis=1)
 
-    if soft_labels:
-        y_train = np.expand_dims(y_train, axis=-1)
-        y_validation = np.expand_dims(y_validation, axis=-1)
-        y_test = np.expand_dims(y_test, axis=-1)
-    else:
-        y_train = (np.expand_dims(y_train, axis=-1) > 0.125).astype(float)
-        y_validation = (np.expand_dims(y_validation, axis=-1) > 0.125).astype(float)
-        y_test = (np.expand_dims(y_test, axis=-1) > 0.125).astype(float)
-
-    x_train, y_train = upsample_minority(x_train, y_train, y_threshold=0.125)
-    print(sum(y_train > 0.125), len(y_train))
-    print(sum(y_validation > 0.125), len(y_validation))
+    x_train, y_train = upsample_minority(x_train, y_train, y_threshold=label_threshold)
+    print('defective trains in train set', sum(y_train > label_threshold), len(y_train))
+    print('defecitve trains in validation set', sum(y_validation > label_threshold), len(y_validation))
     print(x_train.shape)
 
     dl_args = {'batch_size': batch_size, 'shuffle': True, 'num_workers': 4, 'pin_memory': True}
@@ -87,28 +74,22 @@ class Normalizer:
         return data
 
 
-def split(data, a=0.6, b=0.8):
-    """
-    Create a random train, validation, test split of a pandas data frame
-    """
-    a, b = int(a * len(data)), int(b * len(data))
-    data_shuffled = data.sample(frac=1, random_state=1).reset_index(drop=True)
-    train, validation, test = np.split(data_shuffled, [a, b])
-    validation.reset_index(inplace=True, drop=True)
-    test.reset_index(inplace=True, drop=True)
-    return train, validation, test
-
-
 def upsample_minority(x_train, y_train, y_threshold=0.25):
     """
     For binary classification returns a balanced dataset
     by repeatedly sampling from the minority class.
-    For soft labels provide a split point y_threshold
+    For soft labels a split point y_threshold must be provided
 
-    :param x_train: ndarray
-    :param y_train: ndarray
-    :param y_threshold: float
-    :return: reampled_features, resampled_labels
+    Parameters
+    ----------
+    x_train : np.ndarray
+    y_train : np.ndarray
+    y_threshold : float
+
+    Returns
+    -------
+    resampled_feaures : np.ndarray
+    resampled_labels : np.ndarray
     """
     pos_features = x_train[np.where(y_train > y_threshold)[0]]
     neg_features = x_train[np.where(y_train < y_threshold)[0]]
@@ -129,137 +110,180 @@ def upsample_minority(x_train, y_train, y_threshold=0.25):
     return resampled_features, resampled_labels
 
 
+class DataExtractor:
 
-def mark_to_vec(marks_in_s, len_sequence):
-    """
-    convert the marks ins seconds into a time series label vector
-    and track durations of the marked sections
-    """
-    mark_in_samp = []
-    for mark in marks_in_s:
-        start = round(float(mark[0]) * SAMPLE_RATE)
-        end = round(float(mark[1]) * SAMPLE_RATE)
-        mark_in_samp.append([start, end])
+    def __init__(self, data_register, *, target_speed, fs, target_fs,
+                 frame_length, hop_length, stft_hoplength, n_mels, speed_normalization=False):
+        self.data_register = data_register
+        self.target_speed = target_speed
+        self.fs = fs
+        self.target_fs = target_fs
 
-    label_vec = np.zeros(len_sequence)
-    for mark in mark_in_samp:
-        label_vec[mark[0]:mark[1]] = 1
-    detection = np.alltrue(label_vec == 0)
+        self.frame_length = frame_length
+        self.hop_length = hop_length
 
-    return label_vec, detection
+        self.stft_hoplength = stft_hoplength
+        self.n_mels = n_mels
 
+        self.speed_normalization = speed_normalization
 
-def extract_aup(aup_path):
-    """
-    Extract audio and annotations from a single audacity project
-    """
-    # parse xml
-    doc = ElementTree.parse(aup_path)
-    root = doc.getroot()
+    def __call__(self, idx):
+        """
+        loads sample and target [idx] from data self.data_register
+        Parameters
+        ----------
+        idx : int
+            index of entry in self.data_register to be loaded,
+            must be in range(len(data_register))
 
-    # load wavfile
-    xml_wave = r'{http://audacity.sourceforge.net/xml/}wavetrack'
-    name = root.find(xml_wave).attrib['name'] + '.wav'
-    print(f'extracting data point {name}')
-    audio = librosa.core.load(data_path + '/' + name, SAMPLE_RATE, mono=False)[0][0, :]
-    audio_len = len(audio)
+        Returns
+        -------
+        samples : np.ndarray ( k x m x t )
+            k log short term mel spectrograms of
+            m mel bands over t time steps
+        targets : np.ndarray ( k x 1 )
+            k hard targets {0, 1}
+        """
+        print(f'started processing {idx} of {self.__len__()}')
+        row = self.data_register.iloc[idx]
 
-    # extract labels
-    xml_label = r'{http://audacity.sourceforge.net/xml/}label'
-    marks_in_s: List[Tuple[str, str]] = []
-    for element in root.iter(xml_label):
-        start = element.attrib['t']
-        end = element.attrib['t1']
-        marks_in_s.append((start, end))
-    label_vec, detection = mark_to_vec(marks_in_s, audio_len)
-    station_vec = np.repeat(station_id, audio_len)
+        # determine resampling fs
+        subsample = self.fs / self.target_fs
+        if self.speed_normalization is True:
+            speed = row.speed_kmh
+            resampling_ratio = np.maximum(speed / self.target_speed, 0.25)
+        else:
+            resampling_ratio = 1.
+        resampling_fs = int(self.fs * resampling_ratio / subsample)
 
-    return station_vec, audio, label_vec, detection
+        # load audio and targets in memory
+        audio, _ = librosa.core.load(row.audio_path, self.fs, mono=False)
+        audio = np.asfortranarray(audio[0])
+        targets = self.mark_to_vec(row.label, self.fs, len(audio))
 
+        # extract log mel spectrograms
+        audio = librosa.core.resample(audio, self.fs, resampling_fs)
+        audio = librosa.util.frame(audio, self.frame_length, self.hop_length)
+        samples = np.stack([self.stmt(x) for x in audio.T])
 
-def stmt(x):
-    """
-    returns the normalized log short term mel spectrogram transformation of signal vector x
-    """
-    x = librosa.feature.melspectrogram(x, sr=SAMPLE_RATE, n_fft=512, hop_length=STFT_HOP_LENGTH, n_mels=N_MELS)
-    x = np.log(x + 1e-12)
-    return x
+        # pool targets
+        targets = librosa.core.resample(targets, self.fs, resampling_fs)
+        targets = librosa.util.frame(targets, self.frame_length, self.hop_length)
+        targets = ((targets.sum(0) / self.frame_length) > 0.125)[:, None]
 
+        return samples, targets
 
-def transform(dataset):
-    X = dataset.audio
-    S = dataset.station
-    Y = dataset.label_vec
+    def stmt(self, x):
+        """
+        short term mel spectrogram of series x with log compression
+        """
+        x = librosa.feature.melspectrogram(x, sr=self.target_fs,
+                                           n_fft=512,
+                                           hop_length=self.stft_hoplength,
+                                           n_mels=self.n_mels)
+        x = np.log(x + 1e-12)
+        return x
 
-    print('starting transform')
-    X = [frame(x, frame_length=FRAME_LENGTH, hop_length=FRAME_HOP_LENGTH) for x in X]
-    Y = [frame(y, frame_length=FRAME_LENGTH, hop_length=FRAME_HOP_LENGTH) for y in Y]
-    S = [frame(s, frame_length=FRAME_LENGTH, hop_length=FRAME_HOP_LENGTH) for s in S]
+    @staticmethod
+    def mark_to_vec(marks_in_s, fs, len_sequence):
+        """
+        convert list of marks in seconds into a time series label vector
+        marked regions are assigned to 1, unmarked regions are assigned to 0.
 
-    X = np.concatenate(X, axis=-1).T
-    X = [stmt(x) for x in tqdm(X)]
-    X = np.stack(X)
-    S = np.concatenate(S, axis=-1).T[:, 0]
-    Y = np.concatenate(Y, axis=-1)
-    Y = Y.mean(axis=0)
+        Parameters
+        ----------
+        marks_in_s : list
+            List of tuples denoting begin and end of marked sections.
+            The values are assumed to be in seconds
+        fs : int
+            Sampling frequency of the annotated source material
+        len_sequence : int
+            Number of samples of the annotated source material
 
-    return X, S, Y
+        Returns
+        -------
+        label_vec : np.ndarray
+            Vector of length len_sequence that contains 1s and 0s according
+            to the marked regions in mark_in_s
+        detection : bool
+            Indicates if at least one anomalous region was marked
+        """
+        mark_in_samp = []
+        for mark in marks_in_s:
+            start = round(float(mark[0]) * fs)
+            end = round(float(mark[1]) * fs)
+            mark_in_samp.append([start, end])
 
+        label_vec = np.zeros(len_sequence)
+        for mark in mark_in_samp:
+            label_vec[mark[0]:mark[1]] = 1
 
-if __name__ == '__main__':
-    SAMPLE_RATE = 8_000  # 48_000
-    FRAME_LENGTH = 16_000  # 96_000
-    FRAME_HOP_LENGTH = 2_000  # 12_000
-    STFT_HOP_LENGTH = 128  # 1024
-    N_MELS = 40
+        return label_vec
 
-    root = os.path.abspath('../data/')
-    _, stations, _ = next(os.walk(root))
-    print(f'found sub folders for station {stations}')
+    def extract_all(self):
+        """
+        extracts all cases provided in data register
+        Returns
+        -------
+        samples : np.ndarray
+            tensor of n_cases x n_features
+        targets : np.nadarray
+            tensor of n_cases x 1
 
-    data = []
-    for station_id, station in enumerate(stations):
-        print(f'loading station {station}')
-        data_path = root + '/' + station
-        files = os.listdir(data_path)
-        audacity_projects = [f for f in files if f.endswith('.aup')]
-        project_paths = [[os.path.join(data_path, aup)] for aup in audacity_projects]
-        print(f'found {len(project_paths)} files')
-
+        """
         with mp.Pool(mp.cpu_count()) as p:
-            station_data = p.starmap(extract_aup, project_paths)
+            data = p.map(self, range(self.__len__()))
+        samples, targets = zip(*data)
+        samples = np.concatenate(samples, axis=0)
+        targets = np.concatenate(targets, axis=0)
+        return samples, targets
 
-        data.extend(station_data)
+    def __len__(self):
+        return len(self.data_register)
 
-    print(len(data))
-    data = pd.DataFrame(data, columns=['station', 'audio', 'label_vec', 'detection'])
-    print('split data')
-    train, validation, test = split(data)
-    del data
 
-    print('start feature extraction')
+def extraction_to_disk(data_registers, **kwargs):
+    """
+    extracts entries in the data_register as paremetrized by **kwargs
+
+    Parameters
+    ----------
+    data_registers : dictionary
+     {'train': 'path', 'validation': 'path', 'test': 'path'}}
+    kwargs : dictionary
+       the kwargs overwrite the defaults of the DataExtractor
+
+    """
+    train_register = pickle.load(open(data_registers['train'], 'rb'))
+    validation_register = pickle.load(open(data_registers['validation'], 'rb'))
+    test_register = pickle.load(open(data_registers['test'], 'rb'))
+
+    X_train, Y_train = DataExtractor(train_register, **kwargs).extract_all()
     normalizer = Normalizer()
-    X_train, S_train, Y_train = transform(train)
-    del train
     X_train = normalizer.fit_transform(X_train)
-    X_validation, S_validation, Y_validation = transform(validation)
-    del validation
+    np.savez('data_train.npz', audio=X_train, target=Y_train)
+    del X_train
+    del Y_train
+
+    X_validation, Y_validation = DataExtractor(validation_register, **kwargs).extract_all()
     X_validation = normalizer.transform(X_validation)
-    X_test, S_test, Y_test = transform(test)
-    del test
+    np.savez('data_validation.npz', audio=X_validation, target=Y_validation)
+    del X_validation
+    del Y_validation
+
+    X_test, Y_test = DataExtractor(test_register, **kwargs).extract_all()
     X_test = normalizer.transform(X_test)
+    np.savez('data_test.npz', audio=X_test, target=Y_test)
+    del X_test
+    del Y_test
 
-    np.savez('mel_train.npz',
-             audio=X_train,
-             station=S_train,
-             label=Y_train)
 
-    np.savez('mel_validation.npz',
-             audio=X_validation,
-             station=S_validation,
-             label=Y_validation)
-
-    np.savez('mel_test.npz',
-             audio=X_test,
-             station=S_test,
-             label=Y_test)
+if __name__ == "__main__":
+    data_register = dict(train='../data/data_register_train.pkl',
+                         validation='../data/data_register_dev.pkl',
+                         test='../data/data_register_test.pkl')
+    extraction_arguments = dict(fs=48_000, target_fs=8_000,
+                                frame_length=16_000, hop_length=2_000,
+                                stft_hoplength=128, n_mels=40,
+                                target_speed=50, speed_normalization=True)
+    extraction_to_disk(data_register, **extraction_arguments)

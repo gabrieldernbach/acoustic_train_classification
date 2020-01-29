@@ -10,8 +10,6 @@ from conv_models import make_model, metrics, RocCallback
 from data_preprocessing import upsample_minority
 
 ex = Experiment("atc: Small_VGG")
-
-
 # path = "mongodb+srv://gabrieldernbach:MUW9TFbgJO7Gm38W@cluster0-g69z0.gcp.mongodb.net"
 # ex.observers.append(MongoObserver(url=path))
 

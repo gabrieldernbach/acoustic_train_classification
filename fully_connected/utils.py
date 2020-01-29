@@ -36,6 +36,7 @@ def treshhold_labels(Y_train, Y_dev, Y_test, threshold=.25):
 def load_monolithic(datapath):
     if os.path.exists(datapath):
         train, dev, test, normalization = pickle.load(open(datapath, 'rb'))
+        # train, dev, test = pickle.load(open(datapath, 'rb'))
     else:
         cwd = os.getcwd()
         os.system(cwd + '/data_monolithic_mfcc.py')

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, average_precision_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
-# from apex import amp
+
 
 class Learner:
 
@@ -11,8 +11,6 @@ class Learner:
         self.model = model.to(self.device)
         self.optimizer = optimizer
         self.mixed_precision = mixed_precision
-        # if self.device == 'cuda' and self.mixed_precision:
-        #     self.model, self.optimizer = amp.initialize(self.model, self.optimizer)
         self.criterion = criterion
         self.scheduler = scheduler
         self.db_observer = db_observer
@@ -28,18 +26,14 @@ class Learner:
     def train(self, data_loader):
         outs_collect = []
         targets_collect = []
-        for i, (samples, targets) in enumerate(data_loader):
-            samples, targets = samples.to(self.device), targets.to(self.device)
+        for i, (samples, context, targets) in enumerate(data_loader):
+            samples, context, targets = samples.to(self.device), context.to(self.device), targets.to(self.device)
             samples, targets = self.mixup(samples, targets, alpha=0.8)
             self.model.train()
             self.optimizer.zero_grad()
-            outs = self.model(samples)
+            outs = self.model(samples, context)
             loss = self.criterion(outs, targets)
 
-            # if self.device == 'cuda' and self.mixed_precision:
-            #     with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-            #         scaled_loss.backward()
-            # else:
             loss.backward()
             self.optimizer.step()
 
@@ -56,10 +50,10 @@ class Learner:
             loss_collected = []
             outs_collect = []
             targets_collect = []
-            for i, (samples, targets) in enumerate(data_loader):
-                samples, targets = samples.to(self.device), targets.to(self.device)
+            for i, (samples, context, targets) in enumerate(data_loader):
+                samples, context, targets = samples.to(self.device), context.to(self.device), targets.to(self.device)
                 self.model.eval()
-                outs = self.model(samples)
+                outs = self.model(samples, context)
                 loss = self.criterion(outs, targets)
 
                 loss_collected.append(loss.item())

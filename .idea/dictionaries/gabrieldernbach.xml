@@ -3,6 +3,7 @@
     <words>
       <w>bilinear</w>
       <w>confmat</w>
+      <w>conv</w>
       <w>convolutional</w>
       <w>cuda</w>
       <w>datapath</w>
@@ -10,14 +11,23 @@
       <w>gabrieldernbach</w>
       <w>gbrt</w>
       <w>imagenet</w>
+      <w>longfilters</w>
+      <w>maxpool</w>
       <w>mfcc</w>
       <w>mfccs</w>
       <w>mixup</w>
+      <w>multires</w>
+      <w>multiscale</w>
       <w>noverlap</w>
       <w>nperseg</w>
       <w>optim</w>
+      <w>pointwise</w>
       <w>regressor</w>
       <w>repitch</w>
+      <w>resample</w>
+      <w>shortfilers</w>
+      <w>spectrograms</w>
+      <w>stft</w>
       <w>testloader</w>
       <w>trainloader</w>
       <w>vectorize</w>

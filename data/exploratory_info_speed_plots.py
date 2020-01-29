@@ -19,7 +19,7 @@ for station in stations:
     for p in csv_path:
         file = pd.read_csv(root_path + '/' + p, sep=';', decimal=',', dtype=np.float32)
         speeds = file.speedInMeterPerSeconds
-        speeds = speeds[(speeds > 2)]
+        # speeds = speeds[(speeds > 2)]
 
         # if len(speeds) > 200:
         #     print(station, p)

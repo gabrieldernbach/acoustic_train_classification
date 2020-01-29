@@ -53,10 +53,12 @@ clf = {
 }
 
 if __name__ == '__main__':
-    subsets = ['data_monolithic_mfcc_BHV.pkl',
-               'data_monolithic_mfcc_BRL.pkl',
-               'data_monolithic_mfcc_VLD.pkl',
-               'data_monolithic_mfcc.pkl', ]
+    # subsets = ['data_monolithic_mfcc_BHV.pkl',
+    #            'data_monolithic_mfcc_BRL.pkl',
+    #            'data_monolithic_mfcc_VLD.pkl',
+    #            'data_monolithic_mfcc.pkl', ]
+
+    subsets = ['data_monolithic_mfcc.pkl']
 
     for i in subsets:
         for j in subsets:
