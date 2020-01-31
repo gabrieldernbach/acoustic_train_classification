@@ -1,6 +1,6 @@
 """
 Creates a register that locates files in given subdirectories
-and extracts the labels from provided aup projects.
+and extracts the targets from provided aup projects.
 
 By default data is assumed to live in:
     data/{station}/{*.aup}
@@ -38,10 +38,10 @@ def extract_aup(aup_path, data_path, station, verbose=1):
         print(f'extracting data point {name}')
     audio_path = f'{data_path}/{name}.wav'
 
-    # extract labels
-    xml_label = r'{http://audacity.sourceforge.net/xml/}label'
+    # extract targets
+    xml_target = r'{http://audacity.sourceforge.net/xml/}label'
     marks = []
-    for element in root.iter(xml_label):
+    for element in root.iter(xml_target):
         start = element.attrib['t']
         end = element.attrib['t1']
         marks.append((start, end))
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     print(len(data))
     data = pd.DataFrame(data, columns=['station', 'audio_path',
-                                       'label', 'detection', 'speed_kmh'])
+                                       'target', 'detection', 'speed_kmh'])
     print('safe file to "data_register.pkl"')
     data.to_pickle('data_register.pkl')
 

@@ -195,7 +195,7 @@ class InstanceExtractor:
         # load audio and targets in memory
         audio, _ = librosa.core.load(row.audio_path, self.fs, mono=False)
         audio = np.asfortranarray(audio[0])
-        targets = self.mark_to_vec(row.label, self.fs, len(audio))
+        targets = self.mark_to_vec(row.target, self.fs, len(audio))
 
         # extract log mel spectrograms
         audio = librosa.core.resample(audio, self.fs, resampling_fs)
@@ -324,13 +324,13 @@ if __name__ == "__main__":
                          test='../data/data_register_test.pkl')
 
     # time series extraction
-    extraction_arguments = dict(fs=48_000, target_fs=2_000,
-                                frame_length=16_000, hop_length=2_000,
-                                extract_mel=False, stft_hoplength=128, n_mels=40,
-                                target_speed=50, collapse_targets=True, speed_normalization=False)
-    # mel spectrogram
     # extraction_arguments = dict(fs=48_000, target_fs=8_000,
     #                             frame_length=16_000, hop_length=2_000,
-    #                             extract_mel=True, stft_hoplength=128, n_mels=40,
-    #                             target_speed=50, collapse_targets=True, speed_normalization=False)
+    #                             extract_mel=False, stft_hoplength=128, n_mels=40,
+    #                             target_speed=50, collapse_targets=True, speed_normalization=True)
+    # mel spectrogram
+    extraction_arguments = dict(fs=48_000, target_fs=8_000,
+                                frame_length=16_000, hop_length=2_000,
+                                extract_mel=True, stft_hoplength=128, n_mels=40,
+                                target_speed=50, collapse_targets=True, speed_normalization=True)
     extraction_to_disk(data_register, **extraction_arguments)
