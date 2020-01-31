@@ -1,5 +1,6 @@
 """
 Custom Pre Activation Residual Network
+use either ELU or ReLu activations
 """
 
 import torch
@@ -25,10 +26,10 @@ class PreActBlock(nn.Module):
             self.shortcut = nn.Conv2d(ins, outs, kernel_size=1, stride=stride, bias=False)
 
     def forward(self, x):
-        out = F.relu(self.bn1(x))
+        out = F.elu(self.bn1(x))
         shortcut = self.shortcut(out)
         out = self.conv1(out)
-        out = self.conv2(F.relu(self.bn2(out)))
+        out = self.conv2(F.elu(self.bn2(out)))
         return out + shortcut
 
 
@@ -59,7 +60,7 @@ class ResNet(nn.Module):
             nn.Linear(512, 256),
             nn.BatchNorm1d(256),
             nn.Dropout(p=0.5),
-            nn.ReLU(),
+            nn.ELU(),
             nn.Linear(256, 1),
             nn.Sigmoid()
         )

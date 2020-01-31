@@ -10,9 +10,10 @@ import numpy as np
 import torch
 from torch import tensor
 from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data.sampler import WeightedRandomSampler
 
 
-def fetch_balanced_dataloaders(batch_size=256, label_threshold=0.125):
+def fetch_balanced_dataloaders(batch_size=256, upsample_in_memory=False):
     files = '/data_train.npz', '/data_validation.npz', '/data_test.npz'
     path = os.path.dirname(os.path.realpath(__file__))
     train_path, validation_path, test_path = [path + s for s in files]
@@ -20,24 +21,31 @@ def fetch_balanced_dataloaders(batch_size=256, label_threshold=0.125):
     train = np.load(train_path, allow_pickle=True)
     validation = np.load(validation_path, allow_pickle=True)
     test = np.load(test_path, allow_pickle=True)
+    print('load train set from numpy')
     x_train, y_train = train['audio'], train['target']
+    print('load validation set from numpy')
     x_validation, y_validation = validation['audio'], validation['target']
+    print('load test set from numpy')
     x_test, y_test = test['audio'], test['target']
 
-    # reshape for convolution
+    # reshape add channel dimension for convolution operation
+    print('expand channel dimension')
     x_train = np.expand_dims(x_train, axis=1)
     x_validation = np.expand_dims(x_validation, axis=1)
     x_test = np.expand_dims(x_test, axis=1)
 
-    x_train, y_train = upsample_minority(x_train, y_train, y_threshold=label_threshold)
-    print('defective trains in train set', sum(y_train > label_threshold), len(y_train))
-    print('defecitve trains in validation set', sum(y_validation > label_threshold), len(y_validation))
-    print(x_train.shape)
+    print('setup train set balance')
+    dl_args = {'batch_size': batch_size, 'num_workers': 4, 'pin_memory': True}
+    if upsample_in_memory:
+        x_train, y_train = upsample_minority(x_train, y_train)
+        train_dl = DataLoader(TensorDataset(tensor(x_train), tensor(y_train).float()), **dl_args, shuffle=True)
+    else:
+        sampler = class_imbalance_sampler(y_train)
+        train_dl = DataLoader(TensorDataset(tensor(x_train), tensor(y_train).float()), **dl_args, sampler=sampler)
 
-    dl_args = {'batch_size': batch_size, 'shuffle': True, 'num_workers': 4, 'pin_memory': True}
-    train_dl = DataLoader(TensorDataset(tensor(x_train), tensor(y_train).float()), **dl_args)
     validation_dl = DataLoader(TensorDataset(tensor(x_validation), tensor(y_validation).float()), **dl_args)
     test_dl = DataLoader(TensorDataset(tensor(x_test), tensor(y_test).float()), **dl_args)
+
     return train_dl, validation_dl, test_dl
 
 
@@ -72,6 +80,31 @@ class Normalizer:
         self.fit(data)
         data = self.transform(data)
         return data
+
+
+def class_imbalance_sampler(labels, threshold=0.125):
+    """
+    infer class imbalance and setup weighted sampler
+
+    Parameters
+    ----------
+    labels : ndarray (n x d)
+         array of either hard of soft 2 class labels
+    threshold : int
+        threshold to be applied on soft labels
+
+    Returns
+    -------
+    sampler : torch object
+
+    """
+    labels = labels > threshold
+    labels = tensor(labels).long().squeeze()
+    class_count = torch.bincount(labels)
+    weighting = 1. / class_count.float()
+    weights = weighting[labels]
+    sampler = WeightedRandomSampler(weights, len(labels))
+    return sampler
 
 
 def upsample_minority(x_train, y_train, y_threshold=0.25):
@@ -110,10 +143,10 @@ def upsample_minority(x_train, y_train, y_threshold=0.25):
     return resampled_features, resampled_labels
 
 
-class DataExtractor:
+class InstanceExtractor:
 
-    def __init__(self, data_register, *, target_speed, fs, target_fs,
-                 frame_length, hop_length, stft_hoplength, n_mels, speed_normalization=False):
+    def __init__(self, data_register, *, target_speed, fs, target_fs, frame_length, collapse_targets,
+                 hop_length, extract_mel, stft_hoplength, n_mels, speed_normalization=False):
         self.data_register = data_register
         self.target_speed = target_speed
         self.fs = fs
@@ -122,6 +155,9 @@ class DataExtractor:
         self.frame_length = frame_length
         self.hop_length = hop_length
 
+        self.collapse_targets = collapse_targets
+
+        self.extract_mel = extract_mel
         self.stft_hoplength = stft_hoplength
         self.n_mels = n_mels
 
@@ -163,13 +199,17 @@ class DataExtractor:
 
         # extract log mel spectrograms
         audio = librosa.core.resample(audio, self.fs, resampling_fs)
-        audio = librosa.util.frame(audio, self.frame_length, self.hop_length)
-        samples = np.stack([self.stmt(x) for x in audio.T])
+        samples = librosa.util.frame(audio, self.frame_length, self.hop_length)
+        if self.extract_mel is True:
+            samples = np.stack([self.stmt(x) for x in samples.T])
+        else:
+            samples = samples.T
 
         # pool targets
         targets = librosa.core.resample(targets, self.fs, resampling_fs)
         targets = librosa.util.frame(targets, self.frame_length, self.hop_length)
-        targets = ((targets.sum(0) / self.frame_length) > 0.125)[:, None]
+        if self.collapse_targets is True:
+            targets = ((targets.sum(0) / self.frame_length) > 0.125)[:, None]
 
         return samples, targets
 
@@ -258,21 +298,21 @@ def extraction_to_disk(data_registers, **kwargs):
     validation_register = pickle.load(open(data_registers['validation'], 'rb'))
     test_register = pickle.load(open(data_registers['test'], 'rb'))
 
-    X_train, Y_train = DataExtractor(train_register, **kwargs).extract_all()
-    normalizer = Normalizer()
-    X_train = normalizer.fit_transform(X_train)
+    X_train, Y_train = InstanceExtractor(train_register, **kwargs).extract_all()
+    # normalizer = Normalizer()
+    # X_train = normalizer.fit_transform(X_train)
     np.savez('data_train.npz', audio=X_train, target=Y_train)
     del X_train
     del Y_train
 
-    X_validation, Y_validation = DataExtractor(validation_register, **kwargs).extract_all()
-    X_validation = normalizer.transform(X_validation)
+    X_validation, Y_validation = InstanceExtractor(validation_register, **kwargs).extract_all()
+    # X_validation = normalizer.transform(X_validation)
     np.savez('data_validation.npz', audio=X_validation, target=Y_validation)
     del X_validation
     del Y_validation
 
-    X_test, Y_test = DataExtractor(test_register, **kwargs).extract_all()
-    X_test = normalizer.transform(X_test)
+    X_test, Y_test = InstanceExtractor(test_register, **kwargs).extract_all()
+    # X_test = normalizer.transform(X_test)
     np.savez('data_test.npz', audio=X_test, target=Y_test)
     del X_test
     del Y_test
@@ -282,8 +322,15 @@ if __name__ == "__main__":
     data_register = dict(train='../data/data_register_train.pkl',
                          validation='../data/data_register_dev.pkl',
                          test='../data/data_register_test.pkl')
-    extraction_arguments = dict(fs=48_000, target_fs=8_000,
+
+    # time series extraction
+    extraction_arguments = dict(fs=48_000, target_fs=2_000,
                                 frame_length=16_000, hop_length=2_000,
-                                stft_hoplength=128, n_mels=40,
-                                target_speed=50, speed_normalization=True)
+                                extract_mel=False, stft_hoplength=128, n_mels=40,
+                                target_speed=50, collapse_targets=True, speed_normalization=False)
+    # mel spectrogram
+    # extraction_arguments = dict(fs=48_000, target_fs=8_000,
+    #                             frame_length=16_000, hop_length=2_000,
+    #                             extract_mel=True, stft_hoplength=128, n_mels=40,
+    #                             target_speed=50, collapse_targets=True, speed_normalization=False)
     extraction_to_disk(data_register, **extraction_arguments)
