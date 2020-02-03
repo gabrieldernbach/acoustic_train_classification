@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+from kymatio import Scattering1D
 from librosa.effects import percussive
 from librosa.effects import pitch_shift
 from librosa.feature.spectral import melspectrogram
@@ -94,3 +96,52 @@ class ExpandDim(object):
 
     def __call__(self, sample):
         return np.expand_dims(sample, self.axis)
+
+
+class Compose(object):
+    """Composes several transforms together.
+
+    Args:
+        transforms (list of ``Transform`` objects): list of transforms to compose.
+    """
+
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, array):
+        for t in self.transforms:
+            array = t(array)
+        return array
+
+    def __repr__(self):
+        format_string = self.__class__.__name__ + '('
+        for t in self.transforms:
+            format_string += '\n'
+            format_string += '    {0}'.format(t)
+        format_string += '\n)'
+        return format_string
+
+
+class ToTensor(object):
+    def __call__(self, array):
+        """
+        Args: np.ndarray
+            array to be converted to tensor.
+
+        Returns:
+            Tensor: Converted array.
+        """
+        return torch.from_numpy(array)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
+
+
+class Scatter1D:
+    def __init__(self, J=6, T=2 ** 14, Q=7):
+        self.scattering = Scattering1D(J, T, Q)
+        self.log_eps = 1e-6
+
+    def __call__(self, samples):
+        Sx = self.scattering.forward(samples)
+        return torch.log(Sx + self.log_eps)

@@ -70,11 +70,11 @@ class Flatten(nn.Module):
         return sample.view(sample.size(0), -1)
 
 
-class CNNTiny(nn.Module):
+class TinyCNN(nn.Module):
     """Convolutional Network of 3x3 filters"""
 
     def __init__(self):
-        super(CNNTiny, self).__init__()
+        super(TinyCNN, self).__init__()
         self.features = nn.Sequential(
             ConvMaxpool(1, 8),  # 40 x 126
             ConvMaxpool(8, 16),  # 20 x 63
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     from torchsummary import summary
 
     ins = torch.randn(500, 1, 40, 126)
-    model = CNNDouble()
+    model = TinyCNN()
     print(model)
     summary(model, input_size=(1, 40, 126))
     #

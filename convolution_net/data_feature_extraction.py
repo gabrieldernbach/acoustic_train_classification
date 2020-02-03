@@ -1,44 +1,16 @@
+"""
+This module defines classes for feature extraction from the raw data set.
+And writes them to disk (numpy npz)
+
+Either call this script by itself or
+import the `extract_to_disk` function
+"""
+
 import multiprocessing as mp
 import pickle
 
 import librosa
 import numpy as np
-
-
-class RegisterExtractor:
-
-    def __init__(self, data_register, sample_tfs, target_tfs):
-        self.data_register = pickle.load(open(data_register, 'rb'))
-        self.sample_tfs = sample_tfs
-        self.target_tfs = target_tfs
-
-    def __getitem__(self, idx):
-        print(f'start processing instance {idx} of {self.__len__()}')
-        register_row = self.data_register.iloc[idx]
-
-        samples = []
-        for tfs in self.sample_tfs:
-            samples = tfs(samples, register_row)
-
-        targets = []
-        for tfs in self.target_tfs:
-            targets = tfs(targets, register_row)
-
-        return samples, targets
-
-    def __call__(self, idx):
-        return self.__getitem__(idx)
-
-    def extract_all(self):
-        with mp.Pool(mp.cpu_count()) as p:
-            data = p.map(self, range(self.__len__()))
-        samples, targets = zip(*data)
-        samples = np.concatenate(samples, axis=0)
-        targets = np.concatenate(targets, axis=0)
-        return samples, targets
-
-    def __len__(self):
-        return len(self.data_register)
 
 
 class LoadAudio:
@@ -163,6 +135,41 @@ class Normalizer:
         return data
 
 
+class RegisterExtractor:
+    def __init__(self, data_register, sample_tfs, target_tfs):
+        self.data_register = pickle.load(open(data_register, 'rb'))
+        self.sample_tfs = sample_tfs
+        self.target_tfs = target_tfs
+
+    def __getitem__(self, idx):
+        print(f'start processing instance {idx} of {self.__len__()}')
+        register_row = self.data_register.iloc[idx]
+
+        samples = []
+        for tfs in self.sample_tfs:
+            samples = tfs(samples, register_row)
+
+        targets = []
+        for tfs in self.target_tfs:
+            targets = tfs(targets, register_row)
+
+        return samples, targets
+
+    def __call__(self, idx):
+        return self.__getitem__(idx)
+
+    def extract_all(self):
+        with mp.Pool(mp.cpu_count()) as p:
+            data = p.map(self, range(self.__len__()))
+        samples, targets = zip(*data)
+        samples = np.concatenate(samples, axis=0)
+        targets = np.concatenate(targets, axis=0)
+        return samples, targets
+
+    def __len__(self):
+        return len(self.data_register)
+
+
 def extract_to_disk(sample_tfs, target_tfs):
     data_registers = dict(train='../data/data_register_train.pkl',
                           validation='../data/data_register_dev.pkl',
@@ -177,7 +184,8 @@ def extract_to_disk(sample_tfs, target_tfs):
             samples = normalizer.fit_transform(samples)
         else:
             samples = normalizer.transform(samples)
-        np.savez(f'data_{split}.npz', samples=samples, targets=targets)
+        np.save(f'data_{split}_samples.npy', samples)
+        np.save(f'data_{split}_targets.npy', targets)
         del samples
         del targets
 
@@ -185,13 +193,11 @@ def extract_to_disk(sample_tfs, target_tfs):
 if __name__ == "__main__":
     sample_tfs = [LoadAudio(fs=48000),
                   ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-                  Frame(frame_length=16000, hop_length=2000),
-                  ShortTermMelTransform(fs=8000, n_mels=40)]
+                  Frame(frame_length=16000, hop_length=4000),
+                  ShortTermMelTransform(fs=8000, n_fft=512, hop_length=128, n_mels=40)]
     target_tfs = [LoadTargets(fs=48000),
                   ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-                  Frame(frame_length=16000, hop_length=2000),
+                  Frame(frame_length=16000, hop_length=4000),
                   AvgPoolTargets(threshold=0.125)]
 
     extract_to_disk(sample_tfs, target_tfs)
-    # samples, targets = ext[2]
-    # print(samples.shape, targets.shape)
