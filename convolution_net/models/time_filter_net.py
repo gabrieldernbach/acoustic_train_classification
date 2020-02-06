@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -31,25 +32,24 @@ class TimeBlock1D(nn.Module):
             nn.ReLU()
         )
 
+        self.upsample = None
         if ins != outs:
             self.upsample = nn.Conv2d(ins, outs, kernel_size=1)
-        else:
-            self.upsample = None
 
     def forward(self, x):
+        identity = x
+        out = self.layers(x)
+
         if self.upsample is not None:
-            skip = self.upsample(x)
-        else:
-            skip = x
-        x = self.layers(x)
-        return skip + x
+            identity = self.upsample(identity)
+        return out + identity
 
 
 class MultiscaleBlock(nn.Module):
     def __init__(self, ins, cardinality, outs, pool=2):
         super(MultiscaleBlock, self).__init__()
-        self.bn = nn.BatchNorm2d(ins)
-        self.pool = nn.AvgPool2d(kernel_size=(pool, 1))
+        self.bn = nn.BatchNorm2d(ins)  # todo: max pool and average pool
+        self.pool = nn.AvgPool2d(kernel_size=(pool, pool))  # todo: 3 6 9 12, weight norm,
         self.conv35 = nn.Conv2d(ins, cardinality, kernel_size=(1, 35), stride=1, padding=(0, 17))
         self.conv65 = nn.Conv2d(ins, cardinality, kernel_size=(1, 65), stride=1, padding=(0, 32))
         self.conv95 = nn.Conv2d(ins, cardinality, kernel_size=(1, 95), stride=1, padding=(0, 47))
@@ -93,21 +93,18 @@ class TimeFilterNet(nn.Module):
         self.longfilters = nn.Sequential(
             MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=2),  # 20 - 10
             MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=2),  # 10 - 5
-            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=1),
-            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=1),
-            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=1),
-            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=1),
-            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=1),
-            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=1),
+            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=2),  # 5 2
+            MultiscaleBlock(ins=64, cardinality=24, outs=64, pool=2),
             nn.AdaptiveMaxPool2d(1),
             Flatten()
         )
 
         self.classifier = nn.Sequential(
             nn.Dropout(p=0.5),
-            LinearExtended(64, 1024),
-            LinearExtended(1024, 512),
-            nn.Linear(512, 1),
+            LinearExtended(64, 512),
+            nn.Dropout(p=0.5),
+            LinearExtended(512, 64),
+            nn.Linear(64, 1),
             nn.Sigmoid()
         )
 
@@ -133,7 +130,7 @@ class MultiresBlockDilated(nn.Module):
     def __init__(self, ins, cardinality, outs, pool=2):
         super(MultiresBlockDilated, self).__init__()
 
-        self.avp = nn.AvgPool2d(kernel_size=(pool, 1))
+        self.avp = nn.AvgPool2d(kernel_size=(pool, 1))  # todo : max pool freq, avg pool time
         self.bn = nn.BatchNorm2d(ins)
         self.f1 = nn.Conv2d(ins, cardinality, kernel_size=(1, 5), stride=1, dilation=1, padding=(0, 2))
         self.f2 = nn.Conv2d(ins, cardinality, kernel_size=(1, 5), stride=1, dilation=2, padding=(0, 4))
@@ -191,12 +188,11 @@ class TimeFilterNetDilated(nn.Module):
 
 
 if __name__ == '__main__':
-    import torch
     from torchsummary import summary
 
     ins = torch.randn(500, 1, 40, 126)
     model = TimeFilterNet()
-    print(model)
+    # print(model)
     summary(model, input_size=(1, 40, 126))
 
     outs = model(ins)

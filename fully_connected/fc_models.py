@@ -8,7 +8,7 @@ class LinearRegularized(nn.Module):
     Combined Layer of Batch Norm and Dropout and Fully Connected
     """
 
-    def __init__(self, ins, outs, dropout_rate=0.3):
+    def __init__(self, ins, outs, dropout_rate=0.5):
         super(LinearRegularized, self).__init__()
         self.fc = nn.Linear(ins, outs)
         self.bn = nn.BatchNorm1d(outs)
@@ -37,7 +37,21 @@ class DropNN(nn.Module):
         x = self.fc1(x)
         x = self.fc2(x)
         x = torch.sigmoid(self.fc3(x))
-        return x.squeeze()
+        return x
+
+
+class DropNNBig(nn.Module):
+    def __init__(self):
+        super(DropNNBig, self).__init__()
+        self.fc1 = LinearRegularized(640, 320, dropout_rate=0.3)
+        self.fc2 = LinearRegularized(320, 40, dropout_rate=0.3)
+        self.fc3 = LinearRegularized(40, 1, dropout_rate=0)
+
+    def forward(self, x, context):
+        x = self.fc1(x)
+        x = self.fc2(x)
+        x = torch.sigmoid(self.fc3(x))
+        return x
 
 
 class ConditionLayer(nn.Module):

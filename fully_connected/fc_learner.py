@@ -24,22 +24,25 @@ class Learner:
             self.scheduler.step(aps)
 
     def train(self, data_loader):
+        loss_cumulative = 0
         outs_collect = []
         targets_collect = []
-        for i, (samples, context, targets) in enumerate(data_loader):
-            samples, context, targets = samples.to(self.device), context.to(self.device), targets.to(self.device)
-            samples, targets = self.mixup(samples, targets, alpha=0.8)
+        for i, (samples, targets) in enumerate(data_loader):
+            # for i, (samples, context, targets) in enumerate(data_loader):
+            # samples, context, targets = samples.to(self.device), context.to(self.device), targets.to(self.device)
+            samples, targets = self.mixup(samples, targets, alpha=0.3)
             self.model.train()
             self.optimizer.zero_grad()
-            outs = self.model(samples, context)
+            outs = self.model(samples, None)
             loss = self.criterion(outs, targets)
 
             loss.backward()
             self.optimizer.step()
 
             per = (i + 1) / len(data_loader)
+            loss_cumulative += loss.item()
             print(f'\repoch: {self.epoch}, iter {i + 1:3} of {len(data_loader):3}'
-                  f' - {(per * 100):5.1f}%, loss of {loss:.9}', end='')
+                  f' - {(per * 100):5.1f}%, loss of {loss_cumulative:.9}', end='')
             # self.db_observer.log_scalar('train_loss', loss.item(), step=self.epoch + per)
             outs_collect.append(outs.detach().cpu().numpy())
             targets_collect.append(targets.detach().cpu().numpy())
@@ -50,10 +53,11 @@ class Learner:
             loss_collected = []
             outs_collect = []
             targets_collect = []
-            for i, (samples, context, targets) in enumerate(data_loader):
-                samples, context, targets = samples.to(self.device), context.to(self.device), targets.to(self.device)
+            # for i, (samples, context, targets) in enumerate(data_loader):
+            #     samples, context, targets = samples.to(self.device), context.to(self.device), targets.to(self.device)
+            for i, (samples, targets) in enumerate(data_loader):
                 self.model.eval()
-                outs = self.model(samples, context)
+                outs = self.model(samples, None)
                 loss = self.criterion(outs, targets)
 
                 loss_collected.append(loss.item())
@@ -91,6 +95,7 @@ class Learner:
         precision = precision_score(targets_collected, outs_collected, zero_division=False)
         recall = recall_score(targets_collected, outs_collected, zero_division=False)
         f1 = f1_score(targets_collected, outs_collected, zero_division=False)
+        #  todo : add f1 option None (returns both f1 for 0 and 1)
         acc = accuracy_score(targets_collected, outs_collected)
         confmat = confusion_matrix(targets_collected, outs_collected)
         tn, fp, fn, tp = confmat.ravel()

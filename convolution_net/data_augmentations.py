@@ -123,6 +123,12 @@ class Compose(object):
 
 
 class ToTensor(object):
+    def __init__(self, device='cuda'):
+        if device is 'cuda':
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = 'cpu'
+
     def __call__(self, array):
         """
         Args: np.ndarray
@@ -138,10 +144,13 @@ class ToTensor(object):
 
 
 class Scatter1D:
-    def __init__(self, J=6, T=2 ** 14, Q=7):
+    def __init__(self, J=6, T=2 ** 14, Q=7, device='cuda'):
         self.scattering = Scattering1D(J, T, Q)
         self.log_eps = 1e-6
 
+        if device is 'cuda':
+            self.scattering = self.scattering.cuda()
+
     def __call__(self, samples):
         Sx = self.scattering.forward(samples)
-        return torch.log(Sx + self.log_eps)
+        return torch.log(Sx + self.log_eps)[:, 1:, :]

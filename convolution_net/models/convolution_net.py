@@ -129,7 +129,7 @@ if __name__ == '__main__':
     from torchsummary import summary
 
     ins = torch.randn(500, 1, 40, 126)
-    model = TinyCNN()
+    model = CNNDouble()
     print(model)
     summary(model, input_size=(1, 40, 126))
     #

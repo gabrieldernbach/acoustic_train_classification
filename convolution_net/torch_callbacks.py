@@ -125,7 +125,9 @@ class Mixup(Callback):
 
 
 class BinaryClassificationMetrics(Callback):
-    def __init__(self):
+    def __init__(self, threshold=0.5):
+        self.threshold = threshold
+
         self.epoch = 0
         self.batch_idx = 0
         self.phase = None
