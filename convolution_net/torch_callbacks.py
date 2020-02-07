@@ -170,7 +170,7 @@ class BinaryClassificationMetrics(Callback):
         aps = average_precision_score(targets_collected, outs_collected)
 
         # hard target metrics
-        outs_collected = outs_collected > .5
+        outs_collected = outs_collected > self.threshold
         precision = precision_score(targets_collected, outs_collected, zero_division=False)
         recall = recall_score(targets_collected, outs_collected, zero_division=False)
         f1 = f1_score(targets_collected, outs_collected, zero_division=False)
@@ -183,7 +183,6 @@ class BinaryClassificationMetrics(Callback):
 
         if self.phase is 'val':
             learner.val_score = f1
-
 
 class SchedulerWrap(Callback):
     """

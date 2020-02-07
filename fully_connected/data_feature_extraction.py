@@ -195,40 +195,41 @@ def extract_to_disk(sample_tfs, target_tfs, normalize=True):
                           validation='../data/data_register_dev.pkl',
                           test='../data/data_register_test.pkl')
 
-    normalizer = Normalizer()
+    # normalizer = Normalizer()
 
     for split in ['train', 'validation', 'test']:
         register_extractor = RegisterExtractor(data_registers[split], sample_tfs, target_tfs)
         samples, targets = register_extractor.extract_all()
-        if normalize:
-            if split == 'train':
-                samples = normalizer.fit_transform(samples)
-            else:
-                samples = normalizer.transform(samples)
+        # if normalize:
+        #     if split == 'train':
+        #         samples = normalizer.fit_transform(samples)
+        #     else:
+        #         samples = normalizer.transform(samples)
         np.save(f'data_{split}_samples.npy', samples)
         np.save(f'data_{split}_targets.npy', targets)
         del samples
         del targets
+    # pickle.dump(normalizer, open('normalizer.pkl', 'wb'))
 
 
 if __name__ == "__main__":
-    # sample_tfs = [LoadAudio(fs=48000),
-    #               ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-    #               Frame(frame_length=16000, hop_length=4000),
-    #               ShortTermMelTransform(fs=8000, n_fft=512, hop_length=128, n_mels=40)]
-    # target_tfs = [LoadTargets(fs=48000),
-    #               ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-    #               Frame(frame_length=16000, hop_length=4000),
-    #               AvgPoolTargets(threshold=0.125)]
-
     sample_tfs = [LoadAudio(fs=48000),
                   ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-                  Frame(frame_length=16000, hop_length=2000),
-                  MelFrequencyCepstralCoefficients(fs=8000)]
-    context_tfs = [LoadContext(fs=48000)]
+                  Frame(frame_length=16000, hop_length=4000)]
+    # ShortTermMelTransform(fs=8000, n_fft=512, hop_length=128, n_mels=40)]
     target_tfs = [LoadTargets(fs=48000),
                   ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-                  Frame(frame_length=16000, hop_length=2000),
+                  Frame(frame_length=16000, hop_length=4000),
                   AvgPoolTargets(threshold=0.125)]
+
+    # sample_tfs = [LoadAudio(fs=48000),
+    #               ResampleSpeedNormalization(target_fs=8000, target_speed=50),
+    #               Frame(frame_length=16000, hop_length=2000),
+    #               MelFrequencyCepstralCoefficients(fs=8000)]
+    # context_tfs = [LoadContext(fs=48000)]
+    # target_tfs = [LoadTargets(fs=48000),
+    #               ResampleSpeedNormalization(target_fs=8000, target_speed=50),
+    #               Frame(frame_length=16000, hop_length=2000),
+    #               AvgPoolTargets(threshold=0.125)]
 
     extract_to_disk(sample_tfs, target_tfs)

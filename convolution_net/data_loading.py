@@ -9,6 +9,8 @@ from torch import tensor
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from torch.utils.data.sampler import WeightedRandomSampler
 
+from data_augmentation import Normalizer
+
 
 def fetch_dummy():
     """
@@ -97,14 +99,23 @@ def fetch_dataloaders(batch_size, num_workers, memmap, train_tfs, validation_tfs
     validation_set = AcousticFlatSpotDataset('validation', memmap, transforms=validation_tfs)
     test_set = AcousticFlatSpotDataset('test', memmap, transforms=validation_tfs)
 
+    normalizer = Normalizer(DataLoader(train_set, **dl_args))
+    train_set.transforms.transforms.append(normalizer)
+    validation_set.transforms.transforms.append(normalizer)
+    test_set.transforms.transforms.append(normalizer)
+
     sampler = class_imbalance_sampler(train_set)
     train_dl = DataLoader(train_set, **dl_args, sampler=sampler)
     validation_dl = DataLoader(validation_set, **dl_args)
     test_dl = DataLoader(test_set, **dl_args)
 
-    return train_dl, validation_dl, test_dl
+    return train_dl, validation_dl, test_dl, normalizer
 
 
 if __name__ == "__main__":
-    train_dl, validation_dl, test_dl = fetch_dataloaders(64, None)
+    train_dl, validation_dl, test_dl, normalizer = fetch_dataloaders(batch_size=64,
+                                                                     num_workers=1,
+                                                                     memmap=True,
+                                                                     train_tfs=None,
+                                                                     validation_tfs=None)
     print(next(iter(train_dl)))

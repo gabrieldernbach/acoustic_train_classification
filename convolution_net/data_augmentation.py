@@ -6,6 +6,7 @@ from librosa.effects import pitch_shift
 from librosa.feature.spectral import melspectrogram
 from scipy.signal import spectrogram
 from skimage.transform import resize
+from tqdm import tqdm
 
 
 class PitchShift(object):
@@ -141,6 +142,35 @@ class ToTensor(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
+
+
+class Normalizer(object):
+    def __init__(self, data_loader):
+        mean = 0.
+        std = 0.
+        nb_samples = 0.
+        for samples, _ in tqdm(data_loader, desc='infer normalization'):
+            batch_samples = samples.size(0)
+            samples = samples.view(batch_samples, samples.size(1), -1)
+            mean += samples.mean(2).sum(0)
+            std += samples.std(2).sum(0)
+            nb_samples += batch_samples
+
+        self.mean = mean / nb_samples
+        self.std = std / nb_samples
+
+    def __call__(self, sample):
+        sample -= self.mean
+        sample /= self.std
+        return sample
+
+
+class Unsqueeze(object):
+    def __init__(self, dim=1):
+        self.dim = dim
+
+    def __call__(self, sample):
+        return sample.unsqueeze(dim=self.dim)
 
 
 class Scatter1D:
