@@ -1,17 +1,24 @@
-import numpy as np
-import pandas as pd
+import matplotlib.pyplot as plt
 import torch
 
 from torch_callbacks import CallbackHandler
+
+
+def plot_batch(samples):
+    samples = samples.numpy()
+    for i in range(len(samples)):
+        plt.imshow(samples[i, 0, :, :], vmin=-5, vmax=+5)
+        plt.show()
 
 
 class Learner:
 
     def __init__(self, model, criterion, optimizer, callbacks=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = model.to(self.device)
-        self.criterion = criterion
+        # self.model, self.optimizer = amp.initialize(model.to(self.device), optimizer, opt_level='01')
+        self.model = model
         self.optimizer = optimizer
+        self.criterion = criterion
         self.cb = CallbackHandler(callbacks)
 
         self.start_epoch = 0
@@ -66,27 +73,3 @@ class Learner:
         self.cb['SchedulerWrap'] = checkpoint['lr_scheduler']
         self.start_epoch = checkpoint['epoch']
         print(f'resuming from epoch {self.start_epoch}')
-
-
-def get_worst_prediction(model, data_loader, n_idx, target=1.0):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    collected_outs = []
-    collected_targets = []
-    for i, (samples, targets) in enumerate(data_loader):
-        samples, targets = samples.to(device), targets.to(device)
-        outs = model(samples)
-
-        collected_outs.append(outs)
-        collected_targets.append(targets)
-        print(f'{i} of {len(data_loader)}')
-
-    collected_outs = torch.cat(collected_outs, dim=0).squeeze().detach().numpy()
-    collected_targets = torch.cat(collected_targets, dim=0).squeeze().detach().numpy()
-
-    dist = np.abs(collected_targets - collected_outs)
-    table = pd.DataFrame({'outs': collected_outs,
-                          'targets': collected_targets,
-                          'difference': dist})
-    idx = table[table.targets == target].nlargest(n_idx, 'difference').index
-
-    return idx, data_loader.dataset.samples[idx]

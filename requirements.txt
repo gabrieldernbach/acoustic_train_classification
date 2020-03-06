@@ -1,3 +1,4 @@
+kymatio
 scikit-image
 apex
 torchsummary

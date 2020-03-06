@@ -1,3 +1,4 @@
+import librosa
 import numpy as np
 import torch
 from kymatio import Scattering1D
@@ -10,27 +11,43 @@ from tqdm import tqdm
 
 
 class PitchShift(object):
-
     def __init__(self,
                  sr=48000,
-                 n_steps=4,
+                 n_steps=None,
                  bins_per_octave=24.,
                  res_type='kaiser_fast'):
+        """
+
+        Parameters
+        ----------
+        sr : int
+        n_steps : [int, int]
+            fractional steps to shift by (width determined by bins per octave)
+            the values get sampled uniformly in the given domain [low, high]
+        bins_per_octave : float
+            determines the step width of n_step
+        res_type : str
+            resampling type
+        """
         self.sr = sr
-        self.n_steps = n_steps
         self.bins_per_octave = bins_per_octave
         self.res_type = res_type
+        if n_steps is None:
+            self.n_steps = [0, 2]
+        else:
+            self.n_steps = n_steps
 
     def __call__(self, sample):
+        n_steps = np.random.uniform(self.n_steps)
+
         sample = pitch_shift(self.sr,
-                             self.n_steps,
+                             n_steps,
                              self.bins_per_octave,
                              self.res_type)
         return sample
 
 
 class MelSpectrogram(object):
-
     def __init__(self, sr=48000, n_fft=2048, hop_length=512):
         self.sr = sr
         self.n_fft = n_fft
@@ -47,8 +64,16 @@ class MelSpectrogram(object):
         return logspec
 
 
-class AdjustAmplitude(object):
+class LogCompress(object):
+    def __init__(self, ratio=1., eps=1e-9):
+        self.ratio = ratio
+        self.eps = eps
 
+    def __call__(self, sample):
+        return np.log(sample * self.ratio + self.eps)
+
+
+class AdjustAmplitude(object):
     def __init__(self, offset_in_db):
         self.offset_in_db = offset_in_db
         self.factor = 10 ** (offset_in_db / 20)
@@ -58,7 +83,6 @@ class AdjustAmplitude(object):
 
 
 class Spectrogram(object):
-
     def __init__(self, nperseg=1024, noverlap=768):
         self.nperseg = nperseg
         self.noverlap = noverlap
@@ -71,7 +95,6 @@ class Spectrogram(object):
 
 
 class PercussiveSeparation(object):
-
     def __init__(self, margin=3.0):
         self.margin = margin
 
@@ -80,7 +103,6 @@ class PercussiveSeparation(object):
 
 
 class Resize(object):
-
     def __init__(self, x_length=300, y_length=300):
         self.x_length = x_length
         self.y_length = y_length
@@ -90,13 +112,48 @@ class Resize(object):
         return resize(sample, (self.x_length, self.y_length))
 
 
-class ExpandDim(object):
-
+class NumpyExpandDim(object):
     def __init__(self, axis=0):
         self.axis = axis
 
     def __call__(self, sample):
         return np.expand_dims(sample, self.axis)
+
+
+class TorchUnsqueeze(object):
+    def __init__(self, dim=0):
+        self.dim = dim
+
+    def __call__(self, sample):
+        return sample.unsqueeze(dim=self.dim)
+
+
+class ShortTermAverageTransform(object):
+    def __init__(self, frame_length, hop_length, threshold=0.5):
+        self.frame_length = frame_length
+        self.hop_length = hop_length
+        self.threshold = threshold
+
+    def __call__(self, sample):
+        sample = np.pad(sample, self.frame_length // 2, mode='reflect')
+        framed = librosa.util.frame(sample,
+                                    frame_length=self.frame_length,
+                                    hop_length=self.hop_length)
+        pooled = np.mean(framed, axis=0)
+
+        thresholded = (pooled > self.threshold).astype('int')
+        return thresholded
+
+
+class ThresholdPoolSequence(object):
+    def __init__(self, threshold=0.125):
+        self.threshold = threshold
+
+    def __call__(self, sample):
+        non_zero_ratio = (sample > 0).sum() / len(sample)
+        label = np.array(non_zero_ratio > self.threshold).astype('float32')
+        label = np.expand_dims(label, 0)
+        return label
 
 
 class Compose(object):
@@ -164,13 +221,8 @@ class Normalizer(object):
         sample /= self.std
         return sample
 
-
-class Unsqueeze(object):
-    def __init__(self, dim=1):
-        self.dim = dim
-
-    def __call__(self, sample):
-        return sample.unsqueeze(dim=self.dim)
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 class Scatter1D:
@@ -184,3 +236,9 @@ class Scatter1D:
     def __call__(self, samples):
         Sx = self.scattering.forward(samples)
         return torch.log(Sx + self.log_eps)[:, 1:, :]
+
+
+if __name__ == "__main__":
+    x = ((np.random.rand(132)) > 0.5) * 1
+    fp = ShortTermAverageTransform(frame_length=13, hop_length=7)
+    fp(x).shape

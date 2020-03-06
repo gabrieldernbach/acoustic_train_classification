@@ -6,11 +6,11 @@ Either call this script by itself or
 import the `extract_to_disk` function
 """
 
-import multiprocessing as mp
 import pickle
 
 import librosa
 import numpy as np
+from joblib import Parallel, delayed
 
 
 class LoadAudio:
@@ -45,8 +45,30 @@ class ResampleSpeedNormalization:
         speed = register_row.speed_kmh
         resampling_ratio = np.maximum(speed / self.target_speed, 0.25)
         self.resample_fs = int(self.fs * resampling_ratio / self.subsample)
-        samples = librosa.core.resample(samples, self.fs, self.target_fs)
+        samples = librosa.core.resample(samples, self.fs, self.resample_fs)
         return samples
+
+
+class ResampleBeatFrequency:
+    def __init__(self, fs=48000, target_fs=8_192, target_freq=8):
+        self.fs = fs
+        self.target_fs = target_fs
+        self.target_freq = target_freq
+        self.subsample_ratio = self.target_fs / 48_000
+
+    def __call__(self, samples, register_row):
+        speed = register_row.speed
+        diameter = register_row.diameter
+        resample_fs = self.normalized_fs(speed, diameter)
+        samples = librosa.core.resample(samples, 48_000, resample_fs)
+        return samples
+
+    def normalized_fs(self, train_speed, wheel_diameter):
+        beat_freq = train_speed / (np.pi * wheel_diameter)
+        normalization_ratio = np.minimum(np.maximum(beat_freq / self.target_freq, 0.2), 2.5)
+        print('normalize speed by factor of', normalization_ratio)
+        resample_fs = int(48_000 * normalization_ratio * self.subsample_ratio)
+        return resample_fs
 
 
 class Frame:
@@ -88,14 +110,6 @@ class MelFrequencyCepstralCoefficients:
         return np.apply_along_axis(self.vec_mfcc, 1, framed_samples)
 
 
-class LoadContext:
-    def __init__(self, fs=48000):
-        pass
-
-    def __call__(self, ):  # todo binning?
-        pass
-
-
 class LoadTargets:
     def __init__(self, fs=48000):
         self.fs = fs
@@ -116,43 +130,8 @@ class LoadTargets:
         for mark in mark_in_samp:
             target_vec[mark[0]:mark[1]] = 1
 
-        return target_vec
+        return target_vec.astype('float32')
 
-
-class AvgPoolTargets:
-    def __init__(self, threshold=0.125):
-        self.threshold = threshold
-
-    def __call__(self, targets, _):
-        frame_length = targets.shape[1]
-        targets = ((targets.sum(1) / frame_length) > self.threshold)[:, None]
-        return targets
-
-
-class Normalizer:
-    """
-    computes and stores global mean and variance for a set of ndarrays.
-    The dimensions are assumed as instance x height x length
-    """
-
-    def __init__(self):
-        self.xm = np.array([])
-        self.xv = np.array([])
-
-    def fit(self, data):
-        self.xm = data.mean(axis=0)
-        self.xv = data.var(axis=0)
-        return self.xm, self.xv
-
-    def transform(self, data):
-        data = data - self.xm
-        data = data / self.xv
-        return data
-
-    def fit_transform(self, data):
-        self.fit(data)
-        data = self.transform(data)
-        return data
 
 
 class RegisterExtractor:
@@ -173,38 +152,36 @@ class RegisterExtractor:
         for tfs in self.target_tfs:
             targets = tfs(targets, register_row)
 
-        return samples, targets
+        station = int(register_row.station_id)
+        speed = int(register_row.speed_bucket)
+
+        return samples, targets, station, speed
 
     def __call__(self, idx):
         return self.__getitem__(idx)
 
     def extract_all(self):
-        with mp.Pool(mp.cpu_count()) as p:
-            data = p.map(self, range(self.__len__()))
-        samples, targets = zip(*data)
+        data = Parallel(n_jobs=4, verbose=10) \
+            (delayed(self)(i) for i in range(self.__len__()))
+        samples, targets, station, speed = zip(*data)
         samples = np.concatenate(samples, axis=0)
-        targets = np.concatenate(targets, axis=0)
-        return samples, targets
+        targets = np.concatenate(targets)
+        station = np.array(station)
+        speed = np.array(speed, axis=0)
+        return samples, targets, station, speed
 
     def __len__(self):
         return len(self.data_register)
 
 
-def extract_to_disk(sample_tfs, target_tfs, normalize=True):
+def extract_to_disk(sample_tfs, target_tfs):
     data_registers = dict(train='../data/data_register_train.pkl',
                           validation='../data/data_register_dev.pkl',
                           test='../data/data_register_test.pkl')
 
-    normalizer = Normalizer()
-
     for split in ['train', 'validation', 'test']:
         register_extractor = RegisterExtractor(data_registers[split], sample_tfs, target_tfs)
         samples, targets = register_extractor.extract_all()
-        if normalize:
-            if split == 'train':
-                samples = normalizer.fit_transform(samples)
-            else:
-                samples = normalizer.transform(samples)
         np.save(f'data_{split}_samples.npy', samples)
         np.save(f'data_{split}_targets.npy', targets)
         del samples
@@ -212,23 +189,15 @@ def extract_to_disk(sample_tfs, target_tfs, normalize=True):
 
 
 if __name__ == "__main__":
-    # sample_tfs = [LoadAudio(fs=48000),
-    #               ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-    #               Frame(frame_length=16000, hop_length=4000),
-    #               ShortTermMelTransform(fs=8000, n_fft=512, hop_length=128, n_mels=40)]
-    # target_tfs = [LoadTargets(fs=48000),
-    #               ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-    #               Frame(frame_length=16000, hop_length=4000),
-    #               AvgPoolTargets(threshold=0.125)]
-
     sample_tfs = [LoadAudio(fs=48000),
-                  ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-                  Frame(frame_length=16000, hop_length=2000),
-                  MelFrequencyCepstralCoefficients(fs=8000)]
-    context_tfs = [LoadContext(fs=48000)]
+                  # ResampleSpeedNormalization(fs=48000, target_fs=8192, target_speed=50),
+                  ResampleBeatFrequency(fs=48000, target_fs=8192, target_freq=8),
+                  Frame(frame_length=16384, hop_length=2048),
+                  ]
     target_tfs = [LoadTargets(fs=48000),
-                  ResampleSpeedNormalization(target_fs=8000, target_speed=50),
-                  Frame(frame_length=16000, hop_length=2000),
-                  AvgPoolTargets(threshold=0.125)]
+                  # ResampleSpeedNormalization(fs=48000, target_fs=8192, target_speed=50),
+                  ResampleBeatFrequency(fs=48000, target_fs=8192, target_freq=8),
+                  Frame(frame_length=16384, hop_length=2048),
+                  ]
 
     extract_to_disk(sample_tfs, target_tfs)

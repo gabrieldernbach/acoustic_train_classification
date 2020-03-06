@@ -29,6 +29,29 @@ class ConvMaxpool(nn.Module):
         return self.block(sample)
 
 
+class Conv1x3Maxpool(nn.Module):
+    def __init__(self, ins, outs):
+        super(Conv1x3Maxpool, self).__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(ins, outs, kernel_size=(1, 3), padding=(0, 1)),
+            nn.BatchNorm2d(outs),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 1))
+        )
+
+        self.excitation = nn.Sequential(
+            nn.AdaptiveMaxPool2d(1),
+            nn.Conv2d(outs, outs // 2, kernel_size=1),
+            nn.ELU(),
+            nn.Conv2d(outs // 2, outs, kernel_size=1),
+        )
+
+    def __call__(self, sample):
+        out = self.block(sample)
+        excitation = self.excitation(out)
+        return out * excitation
+
+
 class ConvConvMaxpool(nn.Module):
     """2x (Conv - Batchnorm - Dropout - Relu)  - Maxpool"""
 
@@ -97,11 +120,38 @@ class TinyCNN(nn.Module):
         return x
 
 
-class CNNDouble(nn.Module):
+class Tiny1x3CNN(nn.Module):
+    """Convolutional Network of 3x3 filters"""
+
+    def __init__(self):
+        super(Tiny1x3CNN, self).__init__()
+        self.features = nn.Sequential(
+            Conv1x3Maxpool(1, 8),  # 40 x 126
+            Conv1x3Maxpool(8, 16),  # 20 x 63
+            Conv1x3Maxpool(16, 32),  # 10 x 31
+            Conv1x3Maxpool(32, 64),  # 5 x 15
+            Conv1x3Maxpool(64, 128),  # 2 x 7
+            nn.AdaptiveMaxPool2d(1),  # 1 x 3 -> 1 x 1
+            Flatten(),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.classifier(x)
+        return x
+
+
+class DoubleCNN(nn.Module):
     """Convolutional Network of 3x3 filters with double convs (VGG style)"""
 
     def __init__(self):
-        super(CNNDouble, self).__init__()
+        super(DoubleCNN, self).__init__()
         self.features = nn.Sequential(
             ConvConvMaxpool(1, 32),  # 128 x 63
             ConvConvMaxpool(32, 64),  # 64 x 31
@@ -129,7 +179,7 @@ if __name__ == '__main__':
     from torchsummary import summary
 
     ins = torch.randn(500, 1, 40, 126)
-    model = CNNDouble()
+    model = Tiny1x3CNN()
     print(model)
     summary(model, input_size=(1, 40, 126))
     #

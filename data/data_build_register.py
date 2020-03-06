@@ -47,13 +47,16 @@ def extract_aup(aup_path, data_path, station, verbose=1):
         marks.append((start, end))
     detection = (len(marks) > 0)
 
-    # extract speed
+    # extract speed and diameter
     path_csv = f'{data_path}/{name}.csv'
     file = pd.read_csv(path_csv, sep=';', decimal=',', dtype=np.float32)
-    speeds = file.speedInMeterPerSeconds
-    speed_kmh = (speeds * 3.6).mean()
 
-    return station, audio_path, marks, detection, speed_kmh
+    speed = file.speedInMeterPerSeconds.mean()
+
+    diameter = file.DiameterInMM / 1_000  # convert to meter
+    diameter = diameter.mean()
+
+    return station, audio_path, marks, detection, speed, diameter
 
 
 if __name__ == '__main__':
@@ -76,8 +79,10 @@ if __name__ == '__main__':
         data.extend(station_data)
 
     print(len(data))
-    data = pd.DataFrame(data, columns=['station', 'audio_path',
-                                       'target', 'detection', 'speed_kmh'])
+    data = pd.DataFrame(data, columns=['station', 'audio_path', 'target',
+                                       'detection', 'speed', 'diameter'])
+    data['station_id'] = data['station'].astype('category').cat.codes
+    data['speed_bucket'] = pd.cut(data['speed'], 10, labels=False)
     print('safe file to "data_register.pkl"')
     data.to_pickle('data_register.pkl')
 

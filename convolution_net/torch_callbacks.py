@@ -2,6 +2,7 @@ import re
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, average_precision_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
 
@@ -124,6 +125,66 @@ class Mixup(Callback):
         return mixed_samples, mixed_targets
 
 
+class SegmentationMetrics(Callback):
+    def __init__(self, threshold=0.5):
+        self.threshold = threshold
+        self.epoch = 0
+        self.phase = None
+        self.batch_idx = 0
+        self.phase_loss = 0
+        self.phase_len = 0
+        self.outs_collected = []
+        self.targets_collected = []
+
+    def on_epoch_end(self, learner, **kwargs):
+        self.epoch = learner.epoch
+
+    def on_phase_begin(self, phase, phase_len, **kwargs):
+        self.phase = phase
+        self.phase_len = phase_len
+        self.batch_idx = 0
+        self.phase_loss = 0
+        self.outs_collected = []
+        self.targets_collected = []
+
+    def on_batch_end(self, loss, outs, targets, **kwargs):
+        outs = F.softmax(outs, dim=1)[:, 1, :]
+        self.outs_collected.append(outs.detach().cpu().numpy())
+        self.targets_collected.append(targets.detach().cpu().numpy())
+
+        self.phase_loss += loss
+        if self.phase is 'train':
+            per = (self.batch_idx + 1) / self.phase_len
+            end = '' if (self.batch_idx + 1 is not self.phase_len) else '\n'
+            print(f'\repoch: {self.epoch}, iter {self.batch_idx + 1:3} of {self.phase_len:3}'
+                  f' - {(per * 100):5.1f}%, loss of {self.phase_loss:.9}', end=end)
+        self.batch_idx += 1
+
+    def on_phase_end(self, learner, **kwargs):
+        outs_collected = np.concatenate(self.outs_collected, axis=0).mean(1)
+        targets_collected = np.concatenate(self.targets_collected, axis=0).mean(1)
+
+        # soft target metrics
+        targets_collected = targets_collected > .0125
+        auc = roc_auc_score(targets_collected, outs_collected)
+        aps = average_precision_score(targets_collected, outs_collected)
+
+        # hard target metrics
+        outs_collected = outs_collected > self.threshold
+        precision = precision_score(targets_collected, outs_collected, zero_division=False)
+        recall = recall_score(targets_collected, outs_collected, zero_division=False)
+        f1n, f1p = f1_score(targets_collected, outs_collected, average=None, zero_division=False)
+        acc = accuracy_score(targets_collected, outs_collected)
+        confmat = confusion_matrix(targets_collected, outs_collected)
+        tn, fp, fn, tp = confmat.ravel()
+        print(f'{self.phase:5} - tp:{tp:5}, fp:{fp:5}, tn:{tn:5}, fn:{fn:5}, '
+              f'precision:{precision:5.2}, recall:{recall:5.2}, f1pos:{f1p:5.2}, f1neg:{f1n:5.2}, '
+              f'acc:{acc:5.2}, auc:{auc:5.2}, aps:{aps:5.2}')
+
+        if self.phase is 'val':
+            learner.val_score = f1p
+
+
 class BinaryClassificationMetrics(Callback):
     def __init__(self, threshold=0.5):
         self.threshold = threshold
@@ -132,8 +193,8 @@ class BinaryClassificationMetrics(Callback):
         self.batch_idx = 0
         self.phase = None
         self.phase_len = None
+        self.phase_loss = 0
 
-        self.losses_collected = []
         self.outs_collected = []
         self.targets_collected = []
         self.val_score = 0
@@ -145,7 +206,7 @@ class BinaryClassificationMetrics(Callback):
         self.phase = phase
         self.phase_len = phase_len
         self.batch_idx = 0
-        self.losses_collected = []
+        self.phase_loss = 0
         self.outs_collected = []
         self.targets_collected = []
 
@@ -153,11 +214,12 @@ class BinaryClassificationMetrics(Callback):
         self.outs_collected.append(outs.detach().cpu().numpy())
         self.targets_collected.append(targets.detach().cpu().numpy())
 
+        self.phase_loss += loss
         if self.phase is 'train':
             per = (self.batch_idx + 1) / self.phase_len
             end = '' if (self.batch_idx + 1 is not self.phase_len) else '\n'
             print(f'\repoch: {self.epoch}, iter {self.batch_idx + 1:3} of {self.phase_len:3}'
-                  f' - {(per * 100):5.1f}%, loss of {loss:.9}', end=end)
+                  f' - {(per * 100):5.1f}%, loss of {self.phase_loss:.9}', end=end)
         self.batch_idx += 1
 
     def on_phase_end(self, learner, **kwargs):
@@ -173,16 +235,16 @@ class BinaryClassificationMetrics(Callback):
         outs_collected = outs_collected > self.threshold
         precision = precision_score(targets_collected, outs_collected, zero_division=False)
         recall = recall_score(targets_collected, outs_collected, zero_division=False)
-        f1 = f1_score(targets_collected, outs_collected, zero_division=False)
+        f1pos, f1neg = f1_score(targets_collected, outs_collected, average=None, zero_division=False)
         acc = accuracy_score(targets_collected, outs_collected)
         confmat = confusion_matrix(targets_collected, outs_collected)
         tn, fp, fn, tp = confmat.ravel()
         print(f'{self.phase:5} - tp:{tp:5}, fp:{fp:5}, tn:{tn:5}, fn:{fn:5}, '
-              f'precision:{precision:5.2}, recall:{recall:5.2}, f1:{f1:5.2}, '
+              f'precision:{precision:5.2}, recall:{recall:5.2}, f1pos:{f1pos:5.2}, f1neg:{f1neg:5.2}'
               f'acc:{acc:5.2}, auc:{auc:5.2}, aps:{aps:5.2}')
 
         if self.phase is 'val':
-            learner.val_score = f1
+            learner.val_score = f1pos
 
 class SchedulerWrap(Callback):
     """

@@ -43,6 +43,8 @@ def class_imbalance_sampler(data_set, threshold=0.125):
 
     """
     targets = data_set.targets
+    if len(targets.shape) > 1:
+        targets = targets.sum(axis=1) / targets.shape[1]
     targets = targets > threshold
     targets = tensor(targets).long().squeeze()
     class_count = torch.bincount(targets)
@@ -72,7 +74,7 @@ class AcousticFlatSpotDataset(Dataset):
         data_path = parent_path + file_name
 
         print(f'loading {file_name}')
-        mmap_mode = 'r' if memmap else None
+        mmap_mode = 'r+' if memmap else None
         self.samples = np.load(f'{data_path}_samples.npy', mmap_mode=mmap_mode)
         self.targets = np.load(f'{data_path}_targets.npy', mmap_mode=mmap_mode)
 
@@ -81,28 +83,56 @@ class AcousticFlatSpotDataset(Dataset):
     def __getitem__(self, idx):
         sample, target = self.samples[idx], self.targets[idx]
 
-        sample = np.expand_dims(sample, axis=0)
-        if self.transforms:
-            sample = self.transforms(sample)
+        if self.transforms['sample']:
+            sample = self.transforms['sample'](sample)
 
-        target = torch.from_numpy(target).float()
+        if self.transforms['target']:
+            target = self.transforms['target'](target)
+
         return sample, target
 
     def __len__(self):
         return self.samples.shape[0]
 
 
-def fetch_dataloaders(batch_size, num_workers, memmap, train_tfs, validation_tfs):
+def fetch_dataloaders(batch_size, num_workers, train_tfs, validation_tfs, memmap=False, normalize=True):
+    """
+    Fetch data loaders and equip them with necessary normalization and imbalance sampler
+
+    Parameters
+    ----------
+    batch_size : int
+        Batch Size
+    num_workers : int
+        Recommended to be 4 per GPU, 1 for debugging
+    train_tfs : Composed Transformations
+        Training Transformations, possibly including augmentation
+    validation_tfs : Composed Transformations
+        Validataion / Test Transformations without data augmentation
+    memmap : bool
+        If True data sets are lazy loaded from disk which largly decreases memory footprint
+        but requires a fast hard drive (ssd)
+
+    Returns
+    -------
+        train_dl : Torch DataLoader
+        validation_dl : Torch DataLoader
+        test_dl : Torch DataLoader
+        normalizer : transformation
+    """
     dl_args = {'batch_size': batch_size, 'num_workers': num_workers, 'pin_memory': True}
 
     train_set = AcousticFlatSpotDataset('train', memmap, transforms=train_tfs)
     validation_set = AcousticFlatSpotDataset('validation', memmap, transforms=validation_tfs)
     test_set = AcousticFlatSpotDataset('test', memmap, transforms=validation_tfs)
 
-    normalizer = Normalizer(DataLoader(train_set, **dl_args))
-    train_set.transforms.transforms.append(normalizer)
-    validation_set.transforms.transforms.append(normalizer)
-    test_set.transforms.transforms.append(normalizer)
+    if normalize:
+        normalizer = Normalizer(DataLoader(train_set, **dl_args))
+        train_set.transforms['sample'].transforms.append(normalizer)
+        validation_set.transforms['sample'].transforms.append(normalizer)
+        ### do not append to test set, they share the transformation already ###
+    else:
+        normalizer = None
 
     sampler = class_imbalance_sampler(train_set)
     train_dl = DataLoader(train_set, **dl_args, sampler=sampler)
@@ -110,6 +140,21 @@ def fetch_dataloaders(batch_size, num_workers, memmap, train_tfs, validation_tfs
     test_dl = DataLoader(test_set, **dl_args)
 
     return train_dl, validation_dl, test_dl, normalizer
+
+
+def plot_network_input(data_loader, n_samples):
+    """
+    Parameters
+    ----------
+    data_loader : troch DataLoader
+    n_samples : int
+    """
+    import matplotlib.pyplot as plt
+    samples, targets = next(iter(data_loader))
+    for i in range(n_samples):
+        plt.imshow(samples[i][0], vmin=-3, vmax=3)
+        plt.colorbar()
+        plt.show()
 
 
 if __name__ == "__main__":

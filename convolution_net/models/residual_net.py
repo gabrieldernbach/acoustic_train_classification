@@ -26,22 +26,34 @@ class PreActBlock(nn.Module):
             self.shortcut = nn.Conv2d(ins, outs, kernel_size=1, stride=stride, bias=False)
 
     def forward(self, x):
-        out = F.elu(self.bn1(x))
-        shortcut = self.shortcut(out)
-        out = self.conv1(out)
+        shortcut = self.shortcut(x)
+        out = self.conv1(F.elu(self.bn1(x)))
         out = self.conv2(F.elu(self.bn2(out)))
         return out + shortcut
 
 
 class DoubleBlock(nn.Module):
-    def __init__(self, ins, outs):
+    def __init__(self, ins, outs, stride=2):
         super(DoubleBlock, self).__init__()
         self.features = nn.Sequential(
-            PreActBlock(ins, outs, stride=2),
+            PreActBlock(ins, outs, stride=stride),
             PreActBlock(outs, outs, stride=1))
 
     def forward(self, x):
         return self.features(x)
+
+
+class AverageMaxPool(nn.Module):
+    def __init__(self):
+        super(AverageMaxPool, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+    def forward(self, x):
+        a = self.avg_pool(x)
+        m = self.max_pool(x)
+        out = torch.cat((a, m), dim=1)
+        return out
 
 
 class ResNet(nn.Module):
@@ -52,12 +64,12 @@ class ResNet(nn.Module):
             DoubleBlock(64, 128),  # 10, 31
             DoubleBlock(128, 256),  # 5, 15
             DoubleBlock(256, 512),  # 3, 7
-            nn.AdaptiveAvgPool2d(1),  # 1, 1
+            AverageMaxPool(),  # 1, 1
             Flatten(),
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(512, 256),
+            nn.Linear(1024, 256),
             nn.BatchNorm1d(256),
             nn.Dropout(p=0.5),
             nn.ELU(),
@@ -71,10 +83,39 @@ class ResNet(nn.Module):
         return x
 
 
+class ResNetLong(nn.Module):
+    def __init__(self):
+        super(ResNetLong, self).__init__()
+        self.features = nn.Sequential(
+            DoubleBlock(1, 64, stride=(2, 1)),  # out shape 20, 63
+            DoubleBlock(64, 128, stride=(2, 1)),  # 10, 31
+            DoubleBlock(128, 256, stride=(2, 1)),  # 5, 15
+            DoubleBlock(256, 512, stride=(2, 1)),  # 3, 7
+            AverageMaxPool(),  # 1, 1
+            Flatten(),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(1024, 256),
+            nn.BatchNorm1d(256),
+            nn.Dropout(p=0.5),
+            nn.ELU(),
+            nn.Linear(256, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.classifier(x)
+        return x
+
 if __name__ == "__main__":
+    from torchsummary import summary
+
     n_samples = 50
-    samples = torch.randn(n_samples, 1, 40, 126)
+    samples = torch.randn(n_samples, 1, 40, 129)
     targets = torch.randint(0, 2, (n_samples, 1))
-    net = ResNet()
-    outs = net(samples)
+    model = ResNetLong()
+    outs = model(samples)
+    summary(model, input_size=(1, 40, 129))
     print(outs.mean(dim=0), outs.var(dim=0))

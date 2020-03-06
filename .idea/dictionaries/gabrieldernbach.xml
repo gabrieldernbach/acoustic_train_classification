@@ -20,6 +20,7 @@
       <w>mixup</w>
       <w>multires</w>
       <w>multiscale</w>
+      <w>ndarray</w>
       <w>noverlap</w>
       <w>nperseg</w>
       <w>optim</w>
@@ -27,11 +28,13 @@
       <w>regressor</w>
       <w>repitch</w>
       <w>resample</w>
+      <w>resampling</w>
       <w>shortfilers</w>
       <w>spectrograms</w>
       <w>stft</w>
       <w>testloader</w>
       <w>trainloader</w>
+      <w>unsqueeze</w>
       <w>vectorize</w>
       <w>xvar</w>
     </words>

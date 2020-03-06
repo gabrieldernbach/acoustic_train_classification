@@ -23,21 +23,19 @@ class MBConvBlock(nn.Module):
         dw_depth = int(ins * dw_ratio)
         se_depth = max(1, int(dw_depth * se_ratio))
 
-        self.skip = nn.Identity()
-        if (ins is not outs) or (stride is not 1):
-            self.skip = nn.Conv2d(ins, outs, kernel_size=1, stride=stride)
+        self.use_res_connect = stride == 1 and ins == outs
 
         self.expansion = nn.Sequential(
+            nn.BatchNorm2d(ins),
+            nn.ReLU(),
             nn.Conv2d(ins, dw_depth, kernel_size=1, bias=False),
-            nn.BatchNorm2d(dw_depth),
-            nn.ReLU()
         )
 
         self.depthwise = nn.Sequential(
+            nn.BatchNorm2d(dw_depth),
+            nn.ReLU(),
             nn.Conv2d(dw_depth, dw_depth, kernel_size=kernel_size,
                       stride=stride, padding=padding, groups=dw_depth, bias=False),
-            nn.BatchNorm2d(dw_depth),
-            nn.ReLU()
         )
 
         self.excitation = nn.Sequential(
@@ -45,13 +43,12 @@ class MBConvBlock(nn.Module):
             nn.Conv2d(dw_depth, se_depth, kernel_size=1),
             nn.ReLU(),
             nn.Conv2d(se_depth, dw_depth, kernel_size=1),
-            nn.Sigmoid()
         )
 
         self.projection = nn.Sequential(
+            nn.ReLU(),
+            nn.BatchNorm2d(dw_depth),
             nn.Conv2d(dw_depth, outs, kernel_size=1, bias=False),
-            nn.BatchNorm2d(outs),
-            nn.ReLU()
         )
 
     def forward(self, inputs):
@@ -59,7 +56,8 @@ class MBConvBlock(nn.Module):
         out = self.depthwise(out)
         out = self.excitation(out) * out
         out = self.projection(out)
-        out = self.skip(inputs) + out
+        if self.use_res_connect:
+            out = inputs + out
         return out
 
 
@@ -69,18 +67,18 @@ class SeMobileNet(nn.Module):
 
         self.features = nn.Sequential(
             MBConvBlock(1, 16, dw_ratio=2, se_ratio=.5, kernel_size=3, stride=1),
-            MBConvBlock(16, 32, dw_ratio=2, se_ratio=.5, kernel_size=3, stride=2),
-            MBConvBlock(32, 64, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=2),
+            MBConvBlock(16, 32, dw_ratio=2, se_ratio=.5, kernel_size=3, stride=(2, 1)),
+            MBConvBlock(32, 64, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=(2, 1)),
             MBConvBlock(64, 64, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
             MBConvBlock(64, 64, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
             MBConvBlock(64, 64, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
-            MBConvBlock(64, 128, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=2),
-            MBConvBlock(128, 128, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
-            MBConvBlock(128, 128, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
-            MBConvBlock(128, 256, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=2),
-            MBConvBlock(256, 256, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
-            MBConvBlock(256, 256, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
-            MBConvBlock(256, 256, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=1),
+            MBConvBlock(64, 128, dw_ratio=2, se_ratio=.5, kernel_size=5, stride=(2, 1)),
+            MBConvBlock(128, 128, dw_ratio=4, se_ratio=.5, kernel_size=5, stride=1),
+            MBConvBlock(128, 128, dw_ratio=4, se_ratio=.5, kernel_size=5, stride=1),
+            MBConvBlock(128, 256, dw_ratio=4, se_ratio=.5, kernel_size=5, stride=(2, 1)),
+            MBConvBlock(256, 256, dw_ratio=4, se_ratio=.5, kernel_size=5, stride=1),
+            MBConvBlock(256, 256, dw_ratio=4, se_ratio=.5, kernel_size=5, stride=1),
+            MBConvBlock(256, 256, dw_ratio=4, se_ratio=.5, kernel_size=5, stride=1),
             nn.AdaptiveAvgPool2d(1),
             Flatten()
         )
