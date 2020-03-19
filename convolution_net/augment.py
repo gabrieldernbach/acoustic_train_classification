@@ -7,7 +7,6 @@ from librosa.effects import pitch_shift
 from librosa.feature.spectral import melspectrogram
 from scipy.signal import spectrogram
 from skimage.transform import resize
-from tqdm import tqdm
 
 
 class PitchShift(object):
@@ -40,10 +39,7 @@ class PitchShift(object):
     def __call__(self, sample):
         n_steps = np.random.uniform(self.n_steps)
 
-        sample = pitch_shift(self.sr,
-                             n_steps,
-                             self.bins_per_octave,
-                             self.res_type)
+        sample = pitch_shift(self.sr, n_steps, self.bins_per_octave, self.res_type)
         return sample
 
 
@@ -202,24 +198,14 @@ class ToTensor(object):
 
 
 class Normalizer(object):
-    def __init__(self, data_loader):
-        mean = 0.
-        std = 0.
-        nb_samples = 0.
-        for samples, _ in tqdm(data_loader, desc='infer normalization'):
-            batch_samples = samples.size(0)
-            samples = samples.view(batch_samples, samples.size(1), -1)
-            mean += samples.mean(2).sum(0)
-            std += samples.std(2).sum(0)
-            nb_samples += batch_samples
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
 
-        self.mean = mean / nb_samples
-        self.std = std / nb_samples
-
-    def __call__(self, sample):
-        sample -= self.mean
-        sample /= self.std
-        return sample
+    def __call__(self, audio):
+        audio -= self.mean
+        audio /= self.std
+        return audio
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
@@ -239,6 +225,4 @@ class Scatter1D:
 
 
 if __name__ == "__main__":
-    x = ((np.random.rand(132)) > 0.5) * 1
-    fp = ShortTermAverageTransform(frame_length=13, hop_length=7)
-    fp(x).shape
+    print('test methods here')

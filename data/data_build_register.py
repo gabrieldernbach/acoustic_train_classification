@@ -54,6 +54,8 @@ def extract_aup(aup_path, data_path, station, verbose=1):
     speed = file.speedInMeterPerSeconds.mean()
 
     diameter = file.DiameterInMM / 1_000  # convert to meter
+    diameter[diameter == 0] = np.NaN
+    diameter.ffill(inplace=True)
     diameter = diameter.mean()
 
     return station, audio_path, marks, detection, speed, diameter

@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 
@@ -7,18 +6,12 @@ class Flatten(nn.Module):
         return sample.view(sample.size(0), -1)
 
 
-class PrintShape(nn.Module):
-    def forward(self, sample):
-        print(sample.shape)
-        return sample
-
-
-class Conv1x(nn.Module):
+class ConvLayer(nn.Module):
     def __init__(self, ins, outs, kernel_size, stride, pool):
-        super(Conv1x, self).__init__()
+        super(ConvLayer, self).__init__()
         layers = [nn.Conv1d(ins, outs, kernel_size, stride),
                   nn.BatchNorm1d(outs),
-                  nn.ReLU()]
+                  nn.ELU()]
 
         if pool is not None:
             layers.append(nn.MaxPool1d(pool))
@@ -34,10 +27,10 @@ class SampleNet(nn.Module):
         super(SampleNet, self).__init__()
 
         self.features = nn.Sequential(
-            Conv1x(1, 16, kernel_size=64, stride=2, pool=8),
-            Conv1x(16, 32, kernel_size=32, stride=2, pool=8),
-            Conv1x(32, 64, kernel_size=16, stride=2, pool=None),
-            Conv1x(64, 128, kernel_size=8, stride=2, pool=None),
+            ConvLayer(1, 16, kernel_size=64, stride=2, pool=8),
+            ConvLayer(16, 32, kernel_size=32, stride=2, pool=8),
+            ConvLayer(32, 64, kernel_size=16, stride=2, pool=None),
+            ConvLayer(64, 128, kernel_size=8, stride=2, pool=None),
 
             nn.AdaptiveAvgPool1d(1),
             Flatten(),
@@ -56,12 +49,11 @@ class SampleNet(nn.Module):
 
 
 if __name__ == "__main__":
-    from torchsummary import summary
-
     model = SampleNet()
-    summary(model, input_size=(1, 16000))
-    print(model)
-    samples = torch.randn(50, 1, 16000)
-    targets = torch.randint(0, 2, (50, 1))
-    outs = model(samples)
-    print(outs.mean(dim=0).item(), outs.std(dim=0).item())
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    # summary(model, input_size=(1, 16000))
+    # print(model)
+    # samples = torch.randn(50, 1, 16000)
+    # targets = torch.randint(0, 2, (50, 1))
+    # outs = model(samples)
+    # print(outs.mean(dim=0).item(), outs.std(dim=0).item())

@@ -1,10 +1,27 @@
 import torch
 import torch.nn as nn
 
+from callback import BinaryClassificationMetrics
+from loss import BCELoss
+
 
 class Flatten(nn.Module):
     def __call__(self, sample):
         return sample.view(sample.size(0), -1)
+
+
+class ConvBlock(nn.Module):
+    def __init__(self, ins, outs):
+        super(ConvBlock, self).__init__()
+        self.block = nn.Sequential(
+            nn.Conv1d(ins, outs, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm1d(outs),
+            nn.ELU(),
+            nn.MaxPool1d(kernel_size=3, stride=3)
+        )
+
+    def forward(self, sample):
+        return self.block(sample)
 
 
 class SeConvBlock(nn.Module):
@@ -58,44 +75,53 @@ class SampleCNN(nn.Module):
             nn.Linear(10, 1), nn.Sigmoid()
         )
 
-    def forward(self, sample):
-        out = self.features(sample)
+        self.criterion = BCELoss
+        self.metric = BinaryClassificationMetrics
+
+    def forward(self, batch):
+        out = self.features(batch['audio'])
         out = self.classifier(out)
-        return out
+        return {'target': out}
 
 
 class TinySampleCNN(nn.Module):
     def __init__(self):
         super(TinySampleCNN, self).__init__()
         self.features = nn.Sequential(
-            nn.Conv1d(1, 32, kernel_size=3, stride=3, padding=1),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-
-            SeConvBlock(32, 64),
-            SeConvBlock(64, 64),
-            SeConvBlock(64, 128),
+            SeConvBlock(1, 32),  # 16384 - 5461
+            SeConvBlock(32, 32),  # - 1820
+            SeConvBlock(32, 32),  # - 606
+            SeConvBlock(32, 64),  # - 202
+            SeConvBlock(64, 64),  # - 67
+            SeConvBlock(64, 64),  # - 22
+            SeConvBlock(64, 128),  # - 7
             nn.AdaptiveAvgPool1d(1),
             Flatten(),
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(128, 256), nn.BatchNorm1d(256), nn.Dropout(p=0.5), nn.ReLU(),
-            nn.Linear(256, 1), nn.Sigmoid()
+            nn.Linear(128, 64), nn.BatchNorm1d(64), nn.Dropout(p=0.5), nn.ReLU(),
+            nn.Linear(64, 1), nn.Sigmoid()
         )
 
-    def forward(self, sample):
-        out = self.features(sample)
+        self.criterion = BCELoss
+        self.metric = BinaryClassificationMetrics
+
+    def forward(self, batch):
+        out = self.features(batch['audio'])
         out = self.classifier(out)
-        return out
+        return {'target': out}
+
 
 if __name__ == "__main__":
-    from torchsummary import summary
-
     n_samples = 50
-    samples = torch.randn(n_samples, 1, 16384)
+    audio = torch.randn(n_samples, 1, 16384)
     targets = torch.randint(0, 2, (n_samples, 1))
-    net = TinySampleCNN()
-    summary(net, (1, 16384))
-    outs = net(samples)
-    print(outs.mean(dim=0), outs.var(dim=0))
+    batch = {'audio': audio}
+
+    model = TinySampleCNN()
+    model(batch)
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    # summary(model, (1, 16384))
+    # outs = net(samples)
+    # print(outs.mean(dim=0), outs.var(dim=0))

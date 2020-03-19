@@ -1,6 +1,9 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+from callback import BinaryClassificationMetrics
+from loss import BCELoss
+
 
 class LinearExtended(nn.Module):
     """Linear - Batchnorm - Dropout - Relu"""
@@ -78,14 +81,6 @@ class ConvConvMaxpool(nn.Module):
         return self.maxpool(x)
 
 
-class PrintLayer(nn.Module):
-    """debugging representation size in sequential layers"""
-
-    def __call__(self, sample):
-        print(sample.shape)
-        return sample
-
-
 class Flatten(nn.Module):
     """unsqueeze empty dimension after final pooling operation"""
 
@@ -114,10 +109,14 @@ class TinyCNN(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, x):
+        self.criterion = BCELoss()
+        self.metric = BinaryClassificationMetrics
+
+    def forward(self, batch):
+        x = batch['audio']
         x = self.features(x)
         x = self.classifier(x)
-        return x
+        return {'target': x}
 
 
 class Tiny1x3CNN(nn.Module):
@@ -141,10 +140,13 @@ class Tiny1x3CNN(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, x):
-        x = self.features(x)
+        self.criterion = BCELoss
+        self.metric = BinaryClassificationMetrics
+
+    def forward(self, batch):
+        x = self.features(batch['audio'])
         x = self.classifier(x)
-        return x
+        return {'target': x}
 
 
 class DoubleCNN(nn.Module):
@@ -168,21 +170,20 @@ class DoubleCNN(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, x):
-        x = self.features(x)
+        self.criterion = BCELoss()
+        self.metric = BinaryClassificationMetrics
+
+    def forward(self, batch):
+        x = self.features(batch['audio'])
         x = self.classifier(x)
-        return x
+        return {'target': x}
 
 
 if __name__ == '__main__':
     import torch
-    from torchsummary import summary
 
     ins = torch.randn(500, 1, 40, 126)
-    model = Tiny1x3CNN()
+    model = TinyCNN()
     print(model)
-    summary(model, input_size=(1, 40, 126))
-    #
-    # outs = model(ins)
-    # print(outs.mean())
-    # print(outs.var())
+    # summary(model, input_size=(1, 40, 126))
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))

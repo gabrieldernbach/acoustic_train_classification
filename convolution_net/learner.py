@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import torch
 
-from torch_callbacks import CallbackHandler
+from callback import CallbackHandler
 
 
 def plot_batch(samples):
@@ -13,17 +13,18 @@ def plot_batch(samples):
 
 class Learner:
 
-    def __init__(self, model, criterion, optimizer, callbacks=None):
+    def __init__(self, model, optimizer, callbacks=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # self.model, self.optimizer = amp.initialize(model.to(self.device), optimizer, opt_level='01')
-        self.model = model
+        self.model = model.to(self.device)
         self.optimizer = optimizer
-        self.criterion = criterion
+        self.criterion = self.model.criterion
         self.cb = CallbackHandler(callbacks)
 
         self.start_epoch = 0
         self.val_score = float()
         self.epoch = int()
+        self.stop = False
 
     def fit(self, train_loader, validation_loader, max_epoch):
         self.cb.on_fit_begin(learner=self)
@@ -34,22 +35,25 @@ class Learner:
             self.validate(validation_loader)
 
             self.cb.on_epoch_end(learner=self)
+            if self.stop:
+                break
 
     def train(self, data_loader):
         self.model.train()
         self.cb.on_phase_begin(phase='train', phase_len=len(data_loader))
 
-        for i, (samples, targets) in enumerate(data_loader):
-            samples, targets = samples.to(self.device), targets.to(self.device)
-            samples, targets = self.cb.on_train_load(data=(samples, targets))
+        for i, batch in enumerate(data_loader):
+            for key in batch.keys():
+                batch[key] = batch[key].to(self.device)
+            batch['audio'], batch['target'] = self.cb.on_train_load(data=(batch['audio'], batch['target']))
 
-            outs = self.model(samples)
-            loss = self.criterion(outs, targets)
+            out = self.model(batch)
+            loss = self.criterion(out, batch)
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            self.cb.on_batch_end(loss=loss, outs=outs, targets=targets)
+            self.cb.on_batch_end(loss=loss, out=out, batch=batch)
         self.cb.on_phase_end(learner=self)
 
     def validate(self, data_loader):
@@ -57,13 +61,15 @@ class Learner:
         self.cb.on_phase_begin(phase='val', phase_len=len(data_loader))
 
         with torch.no_grad():
-            for i, (samples, targets) in enumerate(data_loader):
-                samples, targets = samples.to(self.device), targets.to(self.device)
-                outs = self.model(samples)
-                loss = self.criterion(outs, targets)
+            for i, batch in enumerate(data_loader):
+                for key in batch.keys():
+                    batch[key] = batch[key].to(self.device)
+                out = self.model(batch)
+                loss = self.criterion(out, batch)
 
-                self.cb.on_batch_end(loss=loss, outs=outs, targets=targets)
-        self.cb.on_phase_end(learner=self)
+                self.cb.on_batch_end(loss=loss, out=out, batch=batch)
+        res = self.cb.on_phase_end(learner=self)
+        return res
 
     def resume(self, path='ckpt.pt'):
         print(f'loading checkpoint from {path}')

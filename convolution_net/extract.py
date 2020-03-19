@@ -1,10 +1,11 @@
-import pathlib
 import xml.etree.ElementTree as ElementTree
+from pathlib import Path
 from uuid import uuid4
 
 import librosa
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
 """
@@ -57,10 +58,8 @@ def load_wheel_diameter(path):
     csv_path = path.with_suffix('.csv')
     file = pd.read_csv(csv_path, sep=';', decimal=',', dtype=np.float32)
     diameter = file.DiameterInMM / 1_000  # convert to meter
-    for _ in range(5):
-        diameter = diameter[diameter != diameter.max()]
-    assert not np.any(diameter == 0), f'zero diameter encountered in {path}'
-    assert not np.any(diameter == np.NaN), f'nan diameter encountered in {path}'
+    diameter[diameter == 0] = np.NaN  # treat 0 as nan
+    diameter.ffill(inplace=True)  # forward fill previous
     return diameter.mean()
 
 
@@ -71,19 +70,6 @@ def load_axle(path):
     return axle
 
 
-def load_file(path):
-    f = {}
-    path = pathlib.Path(path)
-    f['file_name'] = path.with_suffix('').name
-    f['station'] = path.parent.name
-    f['train_speed'] = load_train_speed(path)
-    f['wheel_diameter'] = load_wheel_diameter(path)
-    f['axle'] = load_axle(path)
-    f['audio_path'] = path.with_suffix('.wav')
-    f['target_path'] = path.with_suffix('.aup')
-    return f
-
-
 """
 shift representation:
     * resample
@@ -92,10 +78,10 @@ shift representation:
 
 
 class Resample:
-    def __init__(self, target_fs=8_192):
+    def __init__(self, target_fs=8_192, **kwargs):
         self.target_fs = target_fs
 
-    def down(self, sequence):
+    def down(self, sequence, register_row):
         sequence = librosa.core.resample(sequence, 48_000, self.target_fs)
         return sequence
 
@@ -105,17 +91,19 @@ class Resample:
 
 
 class ResampleTrainSpeed:
-    def __init__(self, target_fs=8_192, target_train_speed=14):
+    def __init__(self, target_fs=8_192, target_train_speed=14, **kwargs):
         self.target_fs = target_fs
         self.subsample_ratio = self.target_fs / 48_000
         self.train_speed_target = target_train_speed
 
-    def down(self, sequence, train_speed):
+    def down(self, sequence, register_row):
+        train_speed = register_row['train_speed']
         resample_fs = self.normalized_fs(train_speed)
         sequence = librosa.core.resample(sequence, 48_000, resample_fs)
         return sequence
 
-    def up(self, sequence, train_speed):
+    def up(self, sequence, register_row):
+        train_speed = register_row['train_speed']
         resample_fs = self.normalized_fs(train_speed)
         sequence = librosa.core.resample(sequence, resample_fs, 48_000)
         return sequence
@@ -127,30 +115,34 @@ class ResampleTrainSpeed:
 
 
 class ResampleBeatFrequency:
-    def __init__(self, target_fs=8_192, target_freq=8):
+    def __init__(self, target_fs=8_192, target_freq=8, **kwargs):
         self.target_freq = target_freq
         self.target_fs = target_fs
         self.subsample_ratio = self.target_fs / 48_000
 
-    def down(self, sequence, train_speed, wheel_diameter):
+    def down(self, sequence, register_row):
+        train_speed = register_row['train_speed']  # in meter per second
+        wheel_diameter = register_row['wheel_diameter']  # in meter
         resample_fs = self.normalized_fs(train_speed, wheel_diameter)
         sequence = librosa.core.resample(sequence, 48_000, resample_fs)
         return sequence
 
-    def up(self, sequence, train_speed, wheel_diameter):
+    def up(self, sequence, register_row):
+        train_speed = register_row['train_speed']
+        wheel_diameter = register_row['wheel_diameter']
         resample_fs = self.normalized_fs(train_speed, wheel_diameter)
         sequence = librosa.core.resample(sequence, resample_fs, 48_000)
         return sequence
 
     def normalized_fs(self, train_speed, wheel_diameter):
         beat_freq = train_speed / (np.pi * wheel_diameter)
-        normalization_ratio = beat_freq / self.target_freq
+        normalization_ratio = np.maximum(beat_freq / self.target_freq, 0.25)
         resample_fs = int(48_000 * normalization_ratio * self.subsample_ratio)
         return resample_fs
 
 
 class Frame:
-    def __init__(self, frame_length=16384, hop_length=8192):
+    def __init__(self, frame_length=16384, hop_length=8192, **kwargs):
         self.frame_length = frame_length
         self.hop_length = hop_length
 
@@ -172,58 +164,82 @@ class Frame:
         return sequence
 
 
-root = '/Users/gabrieldernbach/git/acoustic_train_class/data/'
-root = pathlib.Path(root)
-paths = list(root.rglob('*.aup'))
-
-
 def load_meta(path):
-    f = {}
-    path = pathlib.Path(path)
-    f['file_name'] = path.with_suffix('').name
-    f['station'] = path.parent.name
-    f['train_speed'] = load_train_speed(path)
-    f['wheel_diameter'] = load_wheel_diameter(path)
-    f['axle'] = load_axle(path)
-    f['audio_path'] = path.with_suffix('.wav')
-    f['target_path'] = path.with_suffix('.aup')
-    return f
+    m = {}
+    path = Path(path)
+    m['file_name'] = path.with_suffix('').name
+    m['station'] = path.parent.name
+    m['train_speed'] = load_train_speed(path)
+    m['wheel_diameter'] = load_wheel_diameter(path)
+    m['audio_path'] = path.with_suffix('.wav')
+    m['target_path'] = path.with_suffix('.aup')
+    return m
 
 
-resampler = ResampleTrainSpeed()
-framer = Frame()
-for path in paths:
-    meta = load_meta(path)
+class Extractor:
+    def __init__(self, destination, resampler, framer):
+        self.root = destination
+        self.destination = destination
+        self.resampler = resampler
+        self.framer = framer
 
-    audio = load_audio(path)
-    target = load_target(path, len(audio))
+    def __call__(self, r):
+        audio = load_audio(r['audio_path'])
+        target = load_target(r['target_path'], len(audio))
 
-    audio = framer.split(resampler.down(audio, meta['train_speed']))
-    target = framer.split(resampler.down(target, meta['train_speed']))
+        audio = self.framer.split(self.resampler.down(audio, r))
+        target = self.framer.split(self.resampler.down(target, r))
 
-    write_dir = root.parent / 'framed' / meta['station'] / meta['file_name']
-    for i in range(len(audio)):
-        uid = str(uuid4())
-        audio_path = write_dir / f'{uid}_audio'
-        target_path = write_dir / f'{uid}_target'
-        np.save(audio_path, audio[i])
-        np.save(target_path, target[i])
+        write_dir = (
+                self.root.parent
+                / self.destination
+                / r['station']
+                / str(r['speed_bucket'])
+                / r['file_name']
+        )
 
-# register.append(write(audio, target))
+        write_dir.mkdir(parents=True, exist_ok=True)
+
+        for i in range(len(audio)):
+            fname = str(write_dir / str(uuid4()))
+            np.save(fname + '_audio', audio[i])
+            np.save(fname + '_target', target[i])
 
 
-register = []
-for path in paths:
-    f = load_file(path)
-    f['audio'] = framer.split(resampler.down(f['audio'], f['train_speed']))
-    f['target'] = framer.split(resampler.down(f['target'], f['train_speed']))
+def create_dataset(destination_name, resampler, framer):
+    cwd = Path.cwd()
+    import shutil
+    source = cwd.parent / 'data'
+    destination = cwd.parent / destination_name
 
-    write_dir = root.parent / 'data_framed' / f['station'] / f['file_name']
+    if destination.exists():
+        print('clean up destination')
+        shutil.rmtree(destination)
 
-    write_dir.mkdir(parents=True, exist_ok=True)
-    for i in tqdm(range(len(f['audio']))):
-        id = str(uuid4())
-        paudio = write_dir / f'{id}_audio'
-        ptarget = write_dir / f'{id}_target'
-        np.save(paudio, f['audio'][i])
-        np.save(ptarget, f['target'][i])
+    print('indexing source files')
+    source_paths = list(source.rglob('*.aup'))
+    register = pd.DataFrame([load_meta(p) for p in tqdm(source_paths)])
+    register['speed_bucket'] = pd.cut(register.train_speed, bins=10, labels=False)
+
+    print('extracting to disk')
+    extractor = Extractor(destination, resampler, framer)
+    Parallel(4, verbose=10)(delayed(extractor)(r) for _, r in register.iterrows())
+
+
+if __name__ == "__main__":
+    sr = 8192
+    # resampler = Resample(sr)
+    # framer = Frame(sr * 5, sr * 5)
+    # create_dataset('data_resample_sub', resampler, framer)
+
+    resampler = ResampleTrainSpeed(sr, target_train_speed=14)
+    framer = Frame(sr * 5, sr * 5)
+    create_dataset('data_resample_train_5s', resampler, framer)
+
+    resampler = ResampleTrainSpeed(sr, target_train_speed=14)
+    framer = Frame(sr * 2, int(sr * 0.5))
+    create_dataset('data_resample_train_5s', resampler, framer)
+
+    # resampler = ResampleBeatFrequency(sr, target_freq=8)
+    # framer = Frame(sr * 5, sr * 5)
+    # create_dataset('data_resample_freq', resampler, framer)

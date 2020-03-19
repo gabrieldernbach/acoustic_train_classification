@@ -1,5 +1,9 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from callback import SegmentationMetrics
+from loss import PooledSegmentationLoss
 
 
 class DoubleConv(nn.Module):
@@ -9,8 +13,8 @@ class DoubleConv(nn.Module):
             nn.Conv2d(ins, outs, kernel_size=3, padding=1),
             nn.BatchNorm2d(outs),
             nn.ELU(inplace=True),
-            nn.Conv2d(outs, outs, kernel_size=3, padding=1),
-            nn.ELU(inplace=True)
+            # nn.Conv2d(outs, outs, kernel_size=3, padding=1),
+            # nn.ELU(inplace=True)
         )
 
     def forward(self, x):
@@ -63,9 +67,9 @@ class OutConv(nn.Module):
 
 
 class PoolFrequency(nn.Module):
-    def __init__(self):
+    def __init__(self, ins, outs):
         super(PoolFrequency, self).__init__()
-        self.conv = nn.Conv2d(2, 2, kernel_size=(10, 1), stride=(5, 1))
+        self.conv = nn.Conv2d(ins, outs, kernel_size=(10, 1), stride=(5, 1))
         self.apool = nn.AdaptiveAvgPool2d((1, None))
 
     def forward(self, x):
@@ -89,10 +93,10 @@ class Unet(nn.Module):
         self.up3 = Up(256, 64, bilinear)
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, classes)
-        self.apool = PoolFrequency()
+        self.apool = PoolFrequency(classes, classes)
 
-    def forward(self, x):
-        enc1 = self.inc(x)
+    def forward(self, batch):
+        enc1 = self.inc(batch['audio'])
         enc2 = self.down1(enc1)
         enc3 = self.down2(enc2)
         enc4 = self.down3(enc3)
@@ -101,20 +105,55 @@ class Unet(nn.Module):
         x = self.up2(x, enc3)
         x = self.up3(x, enc2)
         x = self.up4(x, enc1)
-        logits = self.apool(self.outc(x))
-        return logits
+        x = self.apool(self.outc(x))
+        x = torch.sigmoid(x)
+        return {'target': x}
 
 
-import torch
+class TinyUnet(nn.Module):
+    def __init__(self, channels=1, classes=1, bilinear=True):
+        super(TinyUnet, self).__init__()
+        self.channels = channels
+        self.classes = classes
+        self.bilinear = bilinear
+
+        self.do = nn.Dropout2d(p=0.1)
+        # d = [16, 32, 64]
+        d = [8, 16, 32]
+        self.inc = DoubleConv(channels, d[0])
+        self.down1 = Down(d[0], d[1])
+        self.down2 = Down(d[1], d[2])
+        self.down3 = Down(d[2], d[2])
+        self.up1 = Up(d[2] + d[2], d[1], bilinear)
+        self.up2 = Up(d[1] + d[1], d[0], bilinear)
+        self.up3 = Up(d[0] + d[0], d[0], bilinear)  # todo convolutions
+        self.outc = OutConv(d[0], classes)
+        self.apool = PoolFrequency(classes, classes)
+
+        self.criterion = PooledSegmentationLoss(llambda=0.5)
+        self.metric = SegmentationMetrics
+
+    def forward(self, batch):
+        enc1 = self.do(self.inc(batch['audio']))
+        enc2 = self.do(self.down1(enc1))
+        enc3 = self.do(self.down2(enc2))
+        x = self.do(self.down3(enc3))
+        x = self.do(self.up1(x, enc3))
+        x = self.do(self.up2(x, enc2))
+        x = self.do(self.up3(x, enc1))
+        x = self.apool(self.outc(x))
+        x = torch.sigmoid(x)
+        return {'target': x}
+
 
 if __name__ == "__main__":
-    ins = torch.randn(20, 1, 40, 129)
-    targets = torch.rand(20, 129).long()
-    model = Unet(1, 2)
-    outs = model(ins)
+    batch = {
+        'audio': torch.randn(20, 1, 40, 129),
+        'target': torch.rand(20, 129).float()
+    }
+    model = TinyUnet(1, 1)
+    outs = model(batch)
 
-    # from torchsummary import summary
-    # summary(model, input_size=(1, 40, 387))
-    criterion = nn.CrossEntropyLoss()
-    criterion(outs, targets)
-    # criterion(outs, targets)
+    criterion = model.criterion
+    print(criterion(outs, batch))
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))

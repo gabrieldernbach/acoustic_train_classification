@@ -2,7 +2,6 @@ import re
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, average_precision_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
 
@@ -70,7 +69,8 @@ class CallbackHandler:
 
     def on_phase_end(self, **kwargs):
         for callback in self.callbacks:
-            callback.on_phase_end(**kwargs)
+            result = callback.on_phase_end(**kwargs)
+        return result
 
     def on_epoch_end(self, **kwargs):
         for callback in self.callbacks:
@@ -127,14 +127,12 @@ class Mixup(Callback):
 
 class SegmentationMetrics(Callback):
     def __init__(self, threshold=0.5):
+        self.phase = str()
         self.threshold = threshold
         self.epoch = 0
-        self.phase = None
-        self.batch_idx = 0
         self.phase_loss = 0
-        self.phase_len = 0
-        self.outs_collected = []
-        self.targets_collected = []
+        self.confusion_classification = np.zeros([2, 2])
+        self.confusion_segmentation = np.zeros([2, 2])
 
     def on_epoch_end(self, learner, **kwargs):
         self.epoch = learner.epoch
@@ -142,15 +140,22 @@ class SegmentationMetrics(Callback):
     def on_phase_begin(self, phase, phase_len, **kwargs):
         self.phase = phase
         self.phase_len = phase_len
-        self.batch_idx = 0
         self.phase_loss = 0
-        self.outs_collected = []
-        self.targets_collected = []
+        self.batch_idx = 0
+        self.confusion_segmentation = np.zeros([2, 2], dtype=int)
+        self.confusion_classification = np.zeros([2, 2], dtype=int)
 
-    def on_batch_end(self, loss, outs, targets, **kwargs):
-        outs = F.softmax(outs, dim=1)[:, 1, :]
-        self.outs_collected.append(outs.detach().cpu().numpy())
-        self.targets_collected.append(targets.detach().cpu().numpy())
+    def on_batch_end(self, loss, out, batch, **kwargs):
+        prediction = out['target'].detach().cpu().numpy()
+        truth = batch['target'].detach().cpu().numpy()
+
+        self.confusion_segmentation += confusion_matrix(
+            (truth >= 0.5).flatten(),
+            (prediction >= 0.5).flatten())
+        self.confusion_classification += confusion_matrix(
+            (truth >= 0.5).mean(axis=-1) >= 0.125,
+            (prediction >= 0.5).mean(axis=-1) >= 0.125,
+        )
 
         self.phase_loss += loss
         if self.phase is 'train':
@@ -161,28 +166,25 @@ class SegmentationMetrics(Callback):
         self.batch_idx += 1
 
     def on_phase_end(self, learner, **kwargs):
-        outs_collected = np.concatenate(self.outs_collected, axis=0).mean(1)
-        targets_collected = np.concatenate(self.targets_collected, axis=0).mean(1)
+        s_tn, s_fp, s_fn, s_tp = self.confusion_segmentation.ravel()
+        c_tn, c_fp, c_fn, c_tp = self.confusion_classification.ravel()
 
-        # soft target metrics
-        targets_collected = targets_collected > .0125
-        auc = roc_auc_score(targets_collected, outs_collected)
-        aps = average_precision_score(targets_collected, outs_collected)
+        s_pr = s_tp / (s_tp + s_fp)
+        s_rc = s_tp / (s_tp + s_fn)
+        s_f1 = 2 * (s_pr * s_rc) / (s_pr + s_rc)
 
-        # hard target metrics
-        outs_collected = outs_collected > self.threshold
-        precision = precision_score(targets_collected, outs_collected, zero_division=False)
-        recall = recall_score(targets_collected, outs_collected, zero_division=False)
-        f1n, f1p = f1_score(targets_collected, outs_collected, average=None, zero_division=False)
-        acc = accuracy_score(targets_collected, outs_collected)
-        confmat = confusion_matrix(targets_collected, outs_collected)
-        tn, fp, fn, tp = confmat.ravel()
-        print(f'{self.phase:5} - tp:{tp:5}, fp:{fp:5}, tn:{tn:5}, fn:{fn:5}, '
-              f'precision:{precision:5.2}, recall:{recall:5.2}, f1pos:{f1p:5.2}, f1neg:{f1n:5.2}, '
-              f'acc:{acc:5.2}, auc:{auc:5.2}, aps:{aps:5.2}')
+        c_pr = c_tp / (c_tp + c_fp)
+        c_rc = c_tp / (c_tp + c_fn)
+        c_f1 = 2 * (c_pr * c_rc) / (c_pr + c_rc)
+
+        print(f'{self.phase:5} \ns_tp:{s_tp:5}, s_fp:{s_fp:5}, s_tn:{s_tn:5}, s_fn:{s_fn:5}, '
+              f's_pr:{s_pr:5.2}, s_rc:{s_rc:5.2}, s_f1:{s_f1:5.2} \n'
+              f'c_tp:{c_tp:5}, c_fp:{c_fp:5}, c_tn:{c_tn:5}, c_fn:{c_fn:5} '
+              f'c_pr:{c_pr:5.2}, c_rc:{c_rc:5.2}, c_f1:{c_f1:5.2}')
 
         if self.phase is 'val':
-            learner.val_score = f1p
+            learner.val_score = c_f1
+            return {'tp': c_tp, 'fp': c_fp, 'fn': c_fn, 'tn': c_tn, 'f1pos': c_f1, 'aps': None}
 
 
 class BinaryClassificationMetrics(Callback):
@@ -210,9 +212,9 @@ class BinaryClassificationMetrics(Callback):
         self.outs_collected = []
         self.targets_collected = []
 
-    def on_batch_end(self, loss, outs, targets, **kwargs):
-        self.outs_collected.append(outs.detach().cpu().numpy())
-        self.targets_collected.append(targets.detach().cpu().numpy())
+    def on_batch_end(self, loss, out, batch, **kwargs):
+        self.outs_collected.append(out['target'].detach().cpu().numpy())
+        self.targets_collected.append(batch['target'].detach().cpu().numpy())
 
         self.phase_loss += loss
         if self.phase is 'train':
@@ -228,6 +230,7 @@ class BinaryClassificationMetrics(Callback):
 
         # soft target metrics
         targets_collected = targets_collected > .125
+
         auc = roc_auc_score(targets_collected, outs_collected)
         aps = average_precision_score(targets_collected, outs_collected)
 
@@ -235,16 +238,18 @@ class BinaryClassificationMetrics(Callback):
         outs_collected = outs_collected > self.threshold
         precision = precision_score(targets_collected, outs_collected, zero_division=False)
         recall = recall_score(targets_collected, outs_collected, zero_division=False)
-        f1pos, f1neg = f1_score(targets_collected, outs_collected, average=None, zero_division=False)
+        f1neg, f1pos = f1_score(targets_collected, outs_collected, average=None, zero_division=False)
         acc = accuracy_score(targets_collected, outs_collected)
         confmat = confusion_matrix(targets_collected, outs_collected)
         tn, fp, fn, tp = confmat.ravel()
         print(f'{self.phase:5} - tp:{tp:5}, fp:{fp:5}, tn:{tn:5}, fn:{fn:5}, '
-              f'precision:{precision:5.2}, recall:{recall:5.2}, f1pos:{f1pos:5.2}, f1neg:{f1neg:5.2}'
+              f'precision:{precision:5.2}, recall:{recall:5.2}, f1pos:{f1pos:5.2}, f1neg:{f1neg:5.2}, '
               f'acc:{acc:5.2}, auc:{auc:5.2}, aps:{aps:5.2}')
 
         if self.phase is 'val':
             learner.val_score = f1pos
+            return {'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn, 'f1pos': f1pos, 'aps': aps}
+
 
 class SchedulerWrap(Callback):
     """
@@ -281,3 +286,21 @@ class SaveCheckpoint(Callback):
                 'lr_scheduler': learner.cb['SchedulerWrap'],
                 'val_score': learner.val_score},
                 self.path)
+
+
+class EarlyStopping(Callback):
+    def __init__(self, patience=20):
+        self.patience = patience
+        self.best_score = 0
+        self.counter = 0
+
+    def on_epoch_end(self, learner):
+        if learner.val_score >= self.best_score:
+            self.best_score = learner.val_score
+            self.counter = 0
+        else:
+            self.counter += 1
+            print(f'been patient for {self.counter} epochs')
+            if self.counter >= self.patience:
+                print(f'early stopping criterion reached')
+                learner.stop = True
