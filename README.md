@@ -1,9 +1,8 @@
 # Acoustic Flat Spot Detection
 
-This repository includes full training code.
+Files of the raw dataset are expected to be located in `data/{station}/{*.aup}`
 
-
-The files are expected to be located in `data/{station}/{*.aup}`  
+## Module Description  
 
 `augment.py` contains classes for augmenting and pre processing data during training.
 
