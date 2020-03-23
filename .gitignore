@@ -2,3 +2,7 @@
 *.pt
 *.pkl
 *.npz
+/semi_supervised_anomaly/
+/fully_connected/
+/hyper_search_unet/
+/hyper_search_waveunet/
