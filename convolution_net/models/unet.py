@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from callback import SegmentationMetrics
-from loss import PooledSegmentationLoss
+from convolution_net.callback import SegmentationMetrics
+from convolution_net.loss import PooledSegmentationLoss
 
 
 class DoubleConv(nn.Module):
@@ -77,7 +77,7 @@ class PoolFrequency(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, channels, classes, bilinear=True):
+    def __init__(self, channels, classes, bilinear=True, loss_ratio=0.5):
         super(Unet, self).__init__()
         self.channels = channels
         self.classes = classes
@@ -95,6 +95,9 @@ class Unet(nn.Module):
         self.outc = OutConv(64, classes)
         self.apool = PoolFrequency(classes, classes)
 
+        self.criterion = PooledSegmentationLoss(llambda=loss_ratio)
+        self.metric = SegmentationMetrics
+
     def forward(self, batch):
         enc1 = self.inc(batch['audio'])
         enc2 = self.down1(enc1)
@@ -111,26 +114,27 @@ class Unet(nn.Module):
 
 
 class TinyUnet(nn.Module):
-    def __init__(self, channels=1, classes=1, bilinear=True):
+    def __init__(self, num_filters, channels=1, classes=1, bilinear=True, loss_ratio=0.5, **kwargs):
         super(TinyUnet, self).__init__()
         self.channels = channels
         self.classes = classes
         self.bilinear = bilinear
 
-        self.do = nn.Dropout2d(p=0.1)
+        self.do = nn.Dropout2d(p=0.001)
+        d = num_filters
         # d = [16, 32, 64]
-        d = [8, 16, 32]
+        # d = [8, 16, 32]
         self.inc = DoubleConv(channels, d[0])
         self.down1 = Down(d[0], d[1])
         self.down2 = Down(d[1], d[2])
         self.down3 = Down(d[2], d[2])
         self.up1 = Up(d[2] + d[2], d[1], bilinear)
         self.up2 = Up(d[1] + d[1], d[0], bilinear)
-        self.up3 = Up(d[0] + d[0], d[0], bilinear)  # todo convolutions
+        self.up3 = Up(d[0] + d[0], d[0], bilinear)
         self.outc = OutConv(d[0], classes)
         self.apool = PoolFrequency(classes, classes)
 
-        self.criterion = PooledSegmentationLoss(llambda=0.5)
+        self.criterion = PooledSegmentationLoss(llambda=loss_ratio)
         self.metric = SegmentationMetrics
 
     def forward(self, batch):
@@ -148,12 +152,17 @@ class TinyUnet(nn.Module):
 
 if __name__ == "__main__":
     batch = {
-        'audio': torch.randn(20, 1, 40, 129),
-        'target': torch.rand(20, 129).float()
+        'audio': torch.randn(20, 1, 40, 321),
+        'target': torch.rand(20, 321).float()
     }
-    model = TinyUnet(1, 1)
-    outs = model(batch)
+    model = TinyUnet(num_filters=[32, 64, 128, 256])
+    from torchsummary import summary
 
-    criterion = model.criterion
-    print(criterion(outs, batch))
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    summary(model, input_size=(1, 20, 321))
+    # model = Unet(1, 1, True)
+    # outs = model(batch)
+    # print(outs['target'].shape)
+    #
+    # criterion = model.criterion
+    # print(criterion(outs, batch))
+    # print(sum(p.numel() for p in model.parameters() if p.requires_grad))

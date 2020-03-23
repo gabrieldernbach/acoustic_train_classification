@@ -11,10 +11,11 @@ from skimage.transform import resize
 
 class PitchShift(object):
     def __init__(self,
-                 sr=48000,
-                 n_steps=None,
-                 bins_per_octave=24.,
-                 res_type='kaiser_fast'):
+                 sr=8_192,
+                 pitch_shift_range_cent=200,
+                 bins_per_octave=1_200,
+                 res_type='kaiser_fast',
+                 **kwargs):
         """
 
         Parameters
@@ -31,15 +32,12 @@ class PitchShift(object):
         self.sr = sr
         self.bins_per_octave = bins_per_octave
         self.res_type = res_type
-        if n_steps is None:
-            self.n_steps = [0, 2]
-        else:
-            self.n_steps = n_steps
+        self.n_steps = pitch_shift_range_cent
 
     def __call__(self, sample):
-        n_steps = np.random.uniform(self.n_steps)
+        n_steps = np.random.randint(-self.n_steps, self.n_steps)
 
-        sample = pitch_shift(self.sr, n_steps, self.bins_per_octave, self.res_type)
+        sample = pitch_shift(sample, self.sr, n_steps, self.bins_per_octave, self.res_type)
         return sample
 
 

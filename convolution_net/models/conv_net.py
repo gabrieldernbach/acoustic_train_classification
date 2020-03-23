@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from callback import BinaryClassificationMetrics
-from loss import BCELoss
+from convolution_net.callback import BinaryClassificationMetrics
+from convolution_net.loss import BCELoss
 
 
 class LinearExtended(nn.Module):

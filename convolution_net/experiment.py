@@ -5,11 +5,11 @@ from pathlib import Path
 import torch.backends.cudnn
 from torchaudio import transforms
 
-from augment import ToTensor, Compose, TorchUnsqueeze, LogCompress, ShortTermAverageTransform
-from callback import SaveCheckpoint, Mixup, SchedulerWrap, EarlyStopping
-from extract import Frame, Resample
-from learner import Learner
-from load import fetch_dataloaders, build_register, train_dev_test
+from convolution_net.augment import ToTensor, Compose, TorchUnsqueeze, LogCompress, ShortTermAverageTransform
+from convolution_net.callback import SaveCheckpoint, Mixup, SchedulerWrap, EarlyStopping
+from convolution_net.extract import Frame, Resample
+from convolution_net.learner import Learner
+from convolution_net.load import fetch_dataloaders, build_register, train_dev_test
 
 # environment
 # torch.manual_seed(0)
@@ -47,11 +47,11 @@ dev_tfs = {
     ]),
 }
 
-from models.conv_net import TinyCNN
-from models.temporal_timbre_net import TinyTemporalTimbreCNN
-from models.sample_net import TinySampleCNN
-from models.concat_net import TinyConcatCNN
-from models.unet import TinyUnet
+from convolution_net.models.conv_net import TinyCNN
+from convolution_net.models.temporal_timbre_net import TinyTemporalTimbreCNN
+from convolution_net.models.sample_net import TinySampleCNN
+from convolution_net.models.concat_net import TinyConcatCNN
+from convolution_net.models.unet import TinyUnet
 
 model_catalogue = {
     'TinyCNN': TinyCNN,
@@ -68,7 +68,7 @@ def main(*, model_name, mixup, subset_fraction, max_epoch, early_stop_patience, 
 
     dl_args = {'batch_size': 64, 'num_workers': 4, 'pin_memory': True}
     dl = fetch_dataloaders(registers, dl_args, train_tfs=train_tfs, dev_tfs=dev_tfs,
-                           segmentation_threshold=0.001, load_in_memory=False)
+                           slide_threshold=0.001, load_in_memory=False)
 
     print('init model')
     model = model_catalogue[model_name]()

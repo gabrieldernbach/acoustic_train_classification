@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import torch
 
-from callback import CallbackHandler
+from convolution_net.callback import CallbackHandler
 
 
 def plot_batch(samples):

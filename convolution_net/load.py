@@ -9,7 +9,7 @@ from torch import tensor
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
-from augment import Normalizer
+from convolution_net.augment import Normalizer
 
 
 def path2entry(path):
@@ -24,6 +24,7 @@ def path2entry(path):
 
 
 def build_register(root):
+    root = Path(root)
     source_paths = list(root.rglob('*audio.npy'))
     print('indexing dataset')
     register = pd.DataFrame([path2entry(p) for p in tqdm(source_paths)])
@@ -108,7 +109,7 @@ def class_imbalance_sampler(targets, segmentation_threshold):
     return sampler
 
 
-def infer_stats(data_loader, segmentation_threshold):
+def infer_stats(data_loader, slide_treshold):
     mean = 0.
     std = 0.
     nb_samples = 0.
@@ -127,14 +128,14 @@ def infer_stats(data_loader, segmentation_threshold):
     normalizer = Normalizer(mean=mean, std=std)
 
     targets = np.concatenate(targets, axis=0)
-    sampler = class_imbalance_sampler(targets, segmentation_threshold)
+    sampler = class_imbalance_sampler(targets, slide_treshold)
     return normalizer, sampler
 
 
-def fetch_dataloaders(registers, dl_args, train_tfs, dev_tfs, segmentation_threshold, load_in_memory=False):
+def fetch_dataloaders(registers, dl_args, train_tfs, dev_tfs, slide_threshold, load_in_memory=False):
     # infer normalization
     tmp_set = HddDataset(registers['train'], transform=train_tfs)
-    normalizer, sampler = infer_stats(DataLoader(tmp_set, **dl_args), segmentation_threshold)
+    normalizer, sampler = infer_stats(DataLoader(tmp_set, **dl_args), slide_threshold)
     train_tfs['audio'].transforms.append(normalizer)
     dev_tfs['audio'].transforms.append(normalizer)
 

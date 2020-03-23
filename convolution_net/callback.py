@@ -153,8 +153,8 @@ class SegmentationMetrics(Callback):
             (truth >= 0.5).flatten(),
             (prediction >= 0.5).flatten())
         self.confusion_classification += confusion_matrix(
-            (truth >= 0.5).mean(axis=-1) >= 0.125,
-            (prediction >= 0.5).mean(axis=-1) >= 0.125,
+            (truth >= 0.5).mean(axis=-1) >= 0.05,
+            (prediction >= 0.5).mean(axis=-1) >= 0.05,
         )
 
         self.phase_loss += loss
