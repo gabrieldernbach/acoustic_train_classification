@@ -99,5 +99,4 @@ if __name__ == '__main__':
 
     model = TinyConcatCNN()
     print(model)
-    # summary(model, input_size=(1, 40, 126))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

@@ -4,9 +4,6 @@ import torch
 from kymatio import Scattering1D
 from librosa.effects import percussive
 from librosa.effects import pitch_shift
-from librosa.feature.spectral import melspectrogram
-from scipy.signal import spectrogram
-from skimage.transform import resize
 
 
 class PitchShift(object):
@@ -41,24 +38,11 @@ class PitchShift(object):
         return sample
 
 
-class MelSpectrogram(object):
-    def __init__(self, sr=48000, n_fft=2048, hop_length=512):
-        self.sr = sr
-        self.n_fft = n_fft
-        self.hop_length = hop_length
-
-    def __call__(self, sample):
-        sample = np.ascontiguousarray(sample)
-        spec = melspectrogram(y=sample,
-                              sr=self.sr,
-                              n_fft=self.n_fft,
-                              hop_length=self.hop_length)
-        logspec = np.log(spec + 1e-9)
-        logspec -= np.mean(logspec)
-        return logspec
-
-
 class LogCompress(object):
+    """
+    apply logarithmic compression of `ratio`
+    """
+
     def __init__(self, ratio=1., eps=1e-9):
         self.ratio = ratio
         self.eps = eps
@@ -67,28 +51,11 @@ class LogCompress(object):
         return np.log(sample * self.ratio + self.eps)
 
 
-class AdjustAmplitude(object):
-    def __init__(self, offset_in_db):
-        self.offset_in_db = offset_in_db
-        self.factor = 10 ** (offset_in_db / 20)
-
-    def __call__(self, sample):
-        return self.factor * sample
-
-
-class Spectrogram(object):
-    def __init__(self, nperseg=1024, noverlap=768):
-        self.nperseg = nperseg
-        self.noverlap = noverlap
-
-    def __call__(self, sample):
-        spec = spectrogram(sample,
-                           nperseg=self.nperseg,
-                           noverlap=self.noverlap)
-        return spec[2]
-
-
 class PercussiveSeparation(object):
+    """
+    separates and returns the percussive part of an audio recording
+    """
+
     def __init__(self, margin=3.0):
         self.margin = margin
 
@@ -96,25 +63,11 @@ class PercussiveSeparation(object):
         return percussive(sample, margin=self.margin)
 
 
-class Resize(object):
-    def __init__(self, x_length=300, y_length=300):
-        self.x_length = x_length
-        self.y_length = y_length
-
-    def __call__(self, sample):
-        # return cv2.resize(sample, (self.x_length, self.y_length))
-        return resize(sample, (self.x_length, self.y_length))
-
-
-class NumpyExpandDim(object):
-    def __init__(self, axis=0):
-        self.axis = axis
-
-    def __call__(self, sample):
-        return np.expand_dims(sample, self.axis)
-
-
 class TorchUnsqueeze(object):
+    """
+    adds singleton dimension representing the channels
+    """
+
     def __init__(self, dim=0):
         self.dim = dim
 
@@ -122,7 +75,28 @@ class TorchUnsqueeze(object):
         return sample.unsqueeze(dim=self.dim)
 
 
+class ThresholdPoolSequence(object):
+    """
+    infers the ratio of true labels of a sequence
+    and returns if the ratio is bigger `threshold`
+    """
+
+    def __init__(self, threshold=0.125):
+        self.threshold = threshold
+
+    def __call__(self, sample):
+        non_zero_ratio = (sample > 0).sum() / len(sample)
+        label = np.array(non_zero_ratio > self.threshold).astype('float32')
+        label = np.expand_dims(label, 0)
+        return label
+
+
 class ShortTermAverageTransform(object):
+    """
+    subsamples a target time series by taking the average in the
+    same frame and hop specs as the a respective STFT would
+    """
+
     def __init__(self, frame_length, hop_length, threshold=0.5):
         self.frame_length = frame_length
         self.hop_length = hop_length
@@ -139,19 +113,8 @@ class ShortTermAverageTransform(object):
         return thresholded
 
 
-class ThresholdPoolSequence(object):
-    def __init__(self, threshold=0.125):
-        self.threshold = threshold
-
-    def __call__(self, sample):
-        non_zero_ratio = (sample > 0).sum() / len(sample)
-        label = np.array(non_zero_ratio > self.threshold).astype('float32')
-        label = np.expand_dims(label, 0)
-        return label
-
-
 class Compose(object):
-    """Composes several transforms together.
+    """Composes several transforms in to a single chain.
 
     Args:
         transforms (list of ``Transform`` objects): list of transforms to compose.
@@ -175,20 +138,11 @@ class Compose(object):
 
 
 class ToTensor(object):
-    def __init__(self, device='cuda'):
-        if device is 'cuda':
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        else:
-            self.device = 'cpu'
+    """
+    converts np.ndarray and returns torch.tensor
+    """
 
     def __call__(self, array):
-        """
-        Args: np.ndarray
-            array to be converted to tensor.
-
-        Returns:
-            Tensor: Converted array.
-        """
         return torch.from_numpy(array)
 
     def __repr__(self):
@@ -196,6 +150,10 @@ class ToTensor(object):
 
 
 class Normalizer(object):
+    """
+    applies channel wise standard normalization
+    """
+
     def __init__(self, mean, std):
         self.mean = mean
         self.std = std
@@ -210,6 +168,11 @@ class Normalizer(object):
 
 
 class Scatter1D:
+    """
+    Alternative to Melspectrogram:
+    see https://arxiv.org/pdf/1304.6763.pdf for details
+    """
+
     def __init__(self, J=6, T=2 ** 14, Q=7, device='cuda'):
         self.scattering = Scattering1D(J, T, Q)
         self.log_eps = 1e-6
@@ -220,7 +183,3 @@ class Scatter1D:
     def __call__(self, samples):
         Sx = self.scattering.forward(samples)
         return torch.log(Sx + self.log_eps)[:, 1:, :]
-
-
-if __name__ == "__main__":
-    print('test methods here')

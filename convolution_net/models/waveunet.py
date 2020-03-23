@@ -121,12 +121,7 @@ class WaveUnet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = FixedWaveUnet()
-    # model = WaveUnet([64, 128, 256, 512])
-    # print(model)
-    from torchsummary import summary
-
-    summary(model, input_size=(1, 40960))
-    batch = torch.randn(50, 1, 40_960)
+    model = WaveUnet([2, 4, 8, 16, 32, 64])
+    batch = {'audio': torch.randn(50, 1, 40_960)}
     model(batch)
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

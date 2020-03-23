@@ -1,3 +1,8 @@
+"""
+Callbacks
+effectivly modularize training modifications for increased flexibility
+"""
+
 import re
 
 import numpy as np

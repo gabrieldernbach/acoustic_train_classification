@@ -122,6 +122,3 @@ if __name__ == "__main__":
     model = TinySampleCNN()
     model(batch)
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    # summary(model, (1, 16384))
-    # outs = net(samples)
-    # print(outs.mean(dim=0), outs.var(dim=0))

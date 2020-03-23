@@ -1,3 +1,7 @@
+"""
+Dataset Construction from Raw Data
+"""
+
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 from uuid import uuid4
@@ -228,18 +232,9 @@ def create_dataset(destination_name, resampler, framer):
 
 if __name__ == "__main__":
     sr = 8192
-    # resampler = Resample(sr)
-    # framer = Frame(sr * 5, sr * 5)
-    # create_dataset('data_resample_sub', resampler, framer)
 
     resampler = ResampleTrainSpeed(sr, target_train_speed=14)
     framer = Frame(sr * 5, sr * 5)
+
     create_dataset('data_resample_train_5s', resampler, framer)
 
-    resampler = ResampleTrainSpeed(sr, target_train_speed=14)
-    framer = Frame(sr * 2, int(sr * 0.5))
-    create_dataset('data_resample_train_5s', resampler, framer)
-
-    # resampler = ResampleBeatFrequency(sr, target_freq=8)
-    # framer = Frame(sr * 5, sr * 5)
-    # create_dataset('data_resample_freq', resampler, framer)

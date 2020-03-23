@@ -156,13 +156,6 @@ if __name__ == "__main__":
         'target': torch.rand(20, 321).float()
     }
     model = TinyUnet(num_filters=[32, 64, 128, 256])
-    from torchsummary import summary
+    outs = model(batch)
 
-    summary(model, input_size=(1, 20, 321))
-    # model = Unet(1, 1, True)
-    # outs = model(batch)
-    # print(outs['target'].shape)
-    #
-    # criterion = model.criterion
-    # print(criterion(outs, batch))
-    # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))

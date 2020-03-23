@@ -3,24 +3,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class LinearExtended(nn.Module):
-    """Linear - Batchnorm - Dropout - Relu"""
+class Flatten(nn.Module):
+    def __call__(self, sample):
+        return sample.view(sample.size(0), -1)
 
+
+class LinearBlock(nn.Module):
     def __init__(self, ins, outs, drop_out_rate=0.5):
-        super(LinearExtended, self).__init__()
+        super(LinearBlock, self).__init__()
         self.fc = nn.Linear(ins, outs)
         self.bn = nn.BatchNorm1d(outs)
         self.do = nn.Dropout(p=drop_out_rate)
 
     def forward(self, x):
         return F.relu(self.do(self.bn(self.fc(x))))
-
-
-class Flatten(nn.Module):
-    """unsqueeze empty dimension after final pooling operation"""
-
-    def __call__(self, sample):
-        return sample.view(sample.size(0), -1)
 
 
 class TimeBlock1D(nn.Module):
@@ -101,9 +97,9 @@ class TimeFilterNet(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.Dropout(p=0.5),
-            LinearExtended(64, 512),
+            LinearBlock(64, 512),
             nn.Dropout(p=0.5),
-            LinearExtended(512, 64),
+            LinearBlock(512, 64),
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
@@ -116,16 +112,6 @@ class TimeFilterNet(nn.Module):
 
 
 class MultiresBlockDilated(nn.Module):
-    """
-    Multiresolution Block with dilated convolutions
-
-    Notes on dilated convolution arithmetic:
-    pytorch only allows for symmetric padding, therefore we can only provide
-    convolution 'same' when kernel size k % 2 != 0.
-    The necessary padding without dilation is floor(k/2).
-    When adding dilation we need to multiply that value times the dilation factor
-    e.g. dilation=3 and kernel=5 results in [3 * floor(5/2)] = 6
-    """
 
     def __init__(self, ins, cardinality, outs, pool=2):
         super(MultiresBlockDilated, self).__init__()
@@ -188,13 +174,7 @@ class TimeFilterNetDilated(nn.Module):
 
 
 if __name__ == '__main__':
-    from torchsummary import summary
-
     ins = torch.randn(500, 1, 40, 126)
     model = TimeFilterNet()
-    # print(model)
-    summary(model, input_size=(1, 40, 126))
-
+    print(model)
     outs = model(ins)
-    print(outs.mean())
-    print(outs.var())

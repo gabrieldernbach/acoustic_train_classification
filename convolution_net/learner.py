@@ -1,21 +1,12 @@
-import matplotlib.pyplot as plt
 import torch
 
 from convolution_net.callback import CallbackHandler
-
-
-def plot_batch(samples):
-    samples = samples.numpy()
-    for i in range(len(samples)):
-        plt.imshow(samples[i, 0, :, :], vmin=-5, vmax=+5)
-        plt.show()
 
 
 class Learner:
 
     def __init__(self, model, optimizer, callbacks=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # self.model, self.optimizer = amp.initialize(model.to(self.device), optimizer, opt_level='01')
         self.model = model.to(self.device)
         self.optimizer = optimizer
         self.criterion = self.model.criterion

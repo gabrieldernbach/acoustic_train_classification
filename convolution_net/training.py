@@ -1,7 +1,12 @@
+"""
+Specify Model Training Run
+"""
+
 import hashlib
 import json
 from pathlib import Path
 
+import pandas as pd
 import torch.backends.cudnn
 from torchaudio import transforms
 
@@ -12,11 +17,9 @@ from convolution_net.learner import Learner
 from convolution_net.load import fetch_dataloaders, build_register, train_dev_test
 
 # environment
-# torch.manual_seed(0)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 torch.set_num_threads(4)
-# np.random.seed(0)
 
 train_tfs = {
     'audio': Compose([
@@ -28,8 +31,8 @@ train_tfs = {
         TorchUnsqueeze()
     ]),
     'target': Compose([
-        ShortTermAverageTransform(frame_length=512, hop_length=128, threshold=0.5),
-        # ThresholdPoolSequence(0.001),  # was 0.125
+        ShortTermAverageTransform(frame_length=512, hop_length=128, threshold=0.5),  # use for segmentation
+        # ThresholdPoolSequence(0.001),  # use for classification
         ToTensor()
     ])
 }
@@ -41,8 +44,8 @@ dev_tfs = {
         TorchUnsqueeze(),
     ]),
     'target': Compose([
-        ShortTermAverageTransform(frame_length=512, hop_length=128, threshold=0.5),
-        # ThresholdPoolSequence(0.001),
+        ShortTermAverageTransform(frame_length=512, hop_length=128, threshold=0.5),  # use for segmentation
+        # ThresholdPoolSequence(0.001),  # use for classification
         ToTensor()
     ]),
 }
@@ -68,7 +71,7 @@ def main(*, model_name, mixup, subset_fraction, max_epoch, early_stop_patience, 
 
     dl_args = {'batch_size': 64, 'num_workers': 4, 'pin_memory': True}
     dl = fetch_dataloaders(registers, dl_args, train_tfs=train_tfs, dev_tfs=dev_tfs,
-                           slide_threshold=0.001, load_in_memory=False)
+                           slide_threshold=0.001)
 
     print('init model')
     model = model_catalogue[model_name]()
@@ -88,6 +91,7 @@ def main(*, model_name, mixup, subset_fraction, max_epoch, early_stop_patience, 
     learner.fit(dl['train'], dl['dev'], max_epoch=max_epoch)
     learner.resume(ckpt_path)
 
+    print('collecting results')
     result = []
     for key in dl.keys():
         r = learner.validate(dl[key])
@@ -99,25 +103,6 @@ def main(*, model_name, mixup, subset_fraction, max_epoch, early_stop_patience, 
 
     return result
 
-
-"""
-export model with
-    * extraction tfs
-    * loading tfs
-    * model
-"""
-
-"""
-model = ['TinyeNet', 'TfNet', 'ConcatNet']
-mixup = [0.0, 0.2, 0.4]
-subset_ratio = [0.2, 0.5, 1.0]
-resample_speed = ['sub', 'speed', 'freq']
-window_length = [1, 2, 5] # in seconds
-"""
-
-"""
-Cross Validation
-"""
 
 if __name__ == "__main__":
 
@@ -135,13 +120,10 @@ if __name__ == "__main__":
     }
     resampler = Resample(**extract_config)
     framer = Frame(**extract_config)
-    # create_dataset(resampler, framer)
 
-    # for mixup in [0.001, 0.2, 0.4]:
-    for mixup in [0.2]:
+    for mixup in [0.001, 0.2, 0.4]:
         for cv_iter in range(5):
-            # for model_name in ['TinyCNN', 'TinyTemporalTimbreCNN', 'TinyConcatCNN']:
-            for model_name in ['TinyUnet']:
+            for model_name in ['TinyCNN', 'TinyTemporalTimbreCNN', 'TinyConcatCNN']:
                 learn_config = {'mixup': mixup,
                                 'model_name': model_name,
                                 'subset_fraction': 0.2,
@@ -159,4 +141,4 @@ if __name__ == "__main__":
                 res = main(**learn_config)
                 config = {**extract_config, **learn_config}
                 res = [{**r, **config} for r in res]
-                # pd.DataFrame(res).to_csv(fpath)
+                pd.DataFrame(res).to_csv(fpath)
