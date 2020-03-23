@@ -16,11 +16,7 @@ print(df.sort_values(by='f1pos', ascending=False))
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-params = [
-    'bilinear', 'freq_cutout', 'learning_rate', 'log_compression',
-    'loss_ratio', 'mixup_ratio', 'num_filters',
-    'subset_fraction', 'time_cutout', 'weight_decay', 'f1pos'
-]
+params = ['learning_rate', 'loss_ratio', 'mixup_ratio', 'num_filters', 'subset_fraction', 'weight_decay', 'f1pos']
 
 df = df[params]
 # sns.catplot(x='val', y='f1pos', col='col', data=df, col_wrap=4, sharex=False)
@@ -36,20 +32,15 @@ plt.show()
 # g.map(sns.scatter(x='f1pos', y='val', data=dfa))
 
 
-chart = sns.catplot(y='f1pos', x='bilinear', kind='box', data=df)
-chart.set(ylim=(0.6, None))
-plt.show()
-
 chart = sns.catplot(y='f1pos', x='num_filters', kind='box', data=df)
 chart.set_xticklabels(rotation=65, horizontalalignment='right')
 chart.set(ylim=(0.6, None))
 plt.show()
 
-seg = ['subset_fraction', 'freq_cutout', 'time_cutout',
-       'log_compression', 'learning_rate', 'weight_decay',
+seg = ['subset_fraction', 'learning_rate', 'weight_decay',
        'loss_ratio', 'mixup_ratio']
 for s in seg:
-    chart = sns.regplot(y='f1pos', x=s, data=df, lowess=True)
+    chart = sns.scatterplot(y='f1pos', x=s, data=df)
     chart.set(ylim=(0.6, None))
     plt.show()
 

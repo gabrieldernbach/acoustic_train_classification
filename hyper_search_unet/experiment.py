@@ -63,7 +63,9 @@ model_catalogue = {
 
 def experiment(**kwargs):
     register = build_register(kwargs['data_path'])  # _5s
-    registers = train_dev_test(register, subset_fraction=kwargs['subset_fraction'])
+    registers = train_dev_test(register,
+                               subset_fraction=kwargs['subset_fraction'],
+                               random_state=kwargs['random_state'])
 
     train_tfs, dev_tfs = construct_transforms(**kwargs)
     dl_args = {'batch_size': 64, 'num_workers': 4, 'pin_memory': True}

@@ -35,16 +35,16 @@ def build_register(root):
     return register
 
 
-def group_split(register, group='file_name'):
-    gss = GroupShuffleSplit(n_splits=1, train_size=0.8, random_state=5)
+def group_split(register, random_state, group='file_name'):
+    gss = GroupShuffleSplit(n_splits=1, train_size=0.8, random_state=random_state)
     split = list(gss.split(register, groups=register[group].values))[0]
     return register.iloc[split[0]], register.iloc[split[1]]
 
 
-def train_dev_test(register, subset_fraction=1.0):
-    remain, test = group_split(register)
+def train_dev_test(register, subset_fraction=1.0, random_state=5):
+    remain, test = group_split(register, random_state=random_state)
     remain = remain.sample(frac=subset_fraction)
-    train, dev = group_split(remain)
+    train, dev = group_split(remain, random_state=random_state)
     return {'train': train, 'dev': dev, 'test': test}
 
 

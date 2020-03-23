@@ -29,6 +29,7 @@ def gen_params():
         learning_rate=uniform(0.0001, 0.1),
         weight_decay=uniform(1e-5, 1e-2),
         subset_fraction=uniform(0.5, 1.0),
+        random_state=randint(0, 200),
         bilinear=choice([True, False]),
 
         max_epoch=100,
