@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from convolution_net.callback import SegmentationMetrics
-from convolution_net.loss import PooledSegmentationLoss
+from main.callback import SegmentationMetrics
+from main.loss import PooledSegmentationLoss
 
 
 class Down(nn.Module):

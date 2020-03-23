@@ -8,7 +8,7 @@ from torch import tensor
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
-from convolution_net.augment import Normalizer
+from main.augment import Normalizer
 
 
 def path2entry(path):

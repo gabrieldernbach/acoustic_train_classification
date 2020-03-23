@@ -10,11 +10,11 @@ import pandas as pd
 import torch.backends.cudnn
 from torchaudio import transforms
 
-from convolution_net.augment import ToTensor, Compose, TorchUnsqueeze, LogCompress, ShortTermAverageTransform
-from convolution_net.callback import SaveCheckpoint, Mixup, SchedulerWrap, EarlyStopping
-from convolution_net.extract import Frame, Resample
-from convolution_net.learner import Learner
-from convolution_net.load import fetch_dataloaders, build_register, train_dev_test
+from main.augment import ToTensor, Compose, TorchUnsqueeze, LogCompress, ShortTermAverageTransform
+from main.callback import SaveCheckpoint, Mixup, SchedulerWrap, EarlyStopping
+from main.extract import Frame, Resample
+from main.learner import Learner
+from main.load import fetch_dataloaders, build_register, train_dev_test
 
 # environment
 torch.backends.cudnn.deterministic = False
@@ -50,11 +50,11 @@ dev_tfs = {
     ]),
 }
 
-from convolution_net.models.conv_net import TinyCNN
-from convolution_net.models.temporal_timbre_net import TinyTemporalTimbreCNN
-from convolution_net.models.sample_net import TinySampleCNN
-from convolution_net.models.concat_net import TinyConcatCNN
-from convolution_net.models.unet import TinyUnet
+from main.models.conv_net import TinyCNN
+from main.models.temporal_timbre_net import TinyTemporalTimbreCNN
+from main.models.sample_net import TinySampleCNN
+from main.models.concat_net import TinyConcatCNN
+from main.models.unet import TinyUnet
 
 model_catalogue = {
     'TinyCNN': TinyCNN,

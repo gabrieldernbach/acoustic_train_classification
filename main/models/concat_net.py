@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from convolution_net.callback import BinaryClassificationMetrics
-from convolution_net.loss import BCELoss
+from main.callback import BinaryClassificationMetrics
+from main.loss import BCELoss
 
 
 class ConvMp(nn.Module):

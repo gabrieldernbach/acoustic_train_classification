@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from convolution_net.callback import BinaryClassificationMetrics
-from convolution_net.loss import BCELoss
+from main.callback import BinaryClassificationMetrics
+from main.loss import BCELoss
 
 
 class ConvBnMp(nn.Module):

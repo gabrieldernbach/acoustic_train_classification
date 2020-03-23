@@ -6,8 +6,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-from convolution_net.extract import ResampleTrainSpeed, Frame
-from convolution_net.extract import load_audio, load_target, load_axle, load_train_speed, load_wheel_diameter
+from main.extract import ResampleTrainSpeed, Frame
+from main.extract import load_audio, load_target, load_axle, load_train_speed, load_wheel_diameter
 
 """
 Collect Observation
@@ -56,7 +56,7 @@ Define Predicitor
 class Predictor:
     def __init__(self, model_path, resampler, framer, batch_size, num_workers):
         checkpoint = torch.load(model_path)
-        from convolution_net.models.unet import TinyUnet
+        from main.models.unet import TinyUnet
         self.model = TinyUnet()
         self.model.load_state_dict(checkpoint['model_parameters'])
         self.model.eval()

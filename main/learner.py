@@ -1,6 +1,6 @@
 import torch
 
-from convolution_net.callback import CallbackHandler
+from main.callback import CallbackHandler
 
 
 class Learner:
