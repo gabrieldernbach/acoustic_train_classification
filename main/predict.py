@@ -46,7 +46,7 @@ class NumpyDataset(Dataset):
 
 
 """
-Define Predicitor
+Define Predictor
     * load model from path
     * transform input data
     * apply model
@@ -58,7 +58,7 @@ class Predictor:
     def __init__(self, model_path, resampler, framer, batch_size, num_workers):
         checkpoint = torch.load(model_path)
         print('initialize model')
-        self.model = TinyUnet([4, 8, 16])
+        self.model = TinyUnet([8, 16, 32])
         self.model.load_state_dict(checkpoint['model_parameters'])
         self.model.eval()
 
@@ -86,9 +86,8 @@ class Predictor:
             out = torch.stack(outs)
             out = out.detach().numpy()
             out = expand(out)
-            out = out.flatten()[:audio.size]
 
-        out = self.resampler.up(out, f)
+        out = self.resampler.up(self.framer.join(out, len(audio)), f)
         return out
 
 
@@ -111,19 +110,22 @@ Visualize Results
 
 
 def plot(f):
+    plt.figure(figsize=(15, 5))
     n = len(f['target'])
     x = np.linspace(0, n / 48000, n) / 60
-    plt.fill_between(x, 0, f['target'], color='C1', alpha=0.5)
+    plt.fill_between(x, 0, f['target'], color='C1', alpha=0.5, label='marked flat spot')
     plt.ylim(0, 1)
-    plt.axhline(0.5, color='C0', alpha=0.5, lw=0.5)
+    plt.axhline(0.5, color='C0', alpha=0.5, lw=0.5, label='decision threshold at 0.5')
 
     n = len(f['out'])
     x = np.linspace(0, n / 48000, n) / 60
-    plt.plot(x, f['out'])
+    plt.plot(x, f['out'], label='flat spot score (predicted)')
 
-    plt.title('file_name', f['file_name'])
-    plt.xlabel('time in seconds')
+    plt.title(f'file_name {f["file_name"]}')
+    plt.xlabel('time in minutes')
     plt.ylabel('flat spot score')
+    plt.legend()
+    plt.savefig(f'/Users/gabrieldernbach/git/acoustic_train_class_data/predictions2/{f["file_name"]}.png')
     plt.show()
 
 
@@ -134,11 +136,11 @@ if __name__ == "__main__":
 
     predictor = Predictor(model_path='model.pt',
                           resampler=ResampleTrainSpeed(target_fs=8192, target_train_speed=14),
-                          framer=Frame(frame_length=5 * 8192, hop_length=5 * 8192),
+                          framer=Frame(frame_length=5 * 8192, hop_length=8192),
                           batch_size=1,
                           num_workers=4)
 
-    for i in range(0, 10):
+    for i in range(35, 200):
         print('predicting train', i)
         f = load_file(paths[i + 100])
         f['out'] = predictor(f)

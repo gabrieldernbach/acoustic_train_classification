@@ -13,8 +13,6 @@ class DoubleConv(nn.Module):
             nn.Conv2d(ins, outs, kernel_size=3, padding=1),
             nn.BatchNorm2d(outs),
             nn.ELU(inplace=True),
-            # nn.Conv2d(outs, outs, kernel_size=3, padding=1),
-            # nn.ELU(inplace=True)
         )
 
     def forward(self, x):
@@ -50,10 +48,10 @@ class Up(nn.Module):
         return self.conv(x)
 
     def match_padding(self, x, skip):
-        diffY = torch.tensor([skip.size()[2] - x.size()[2]])
-        diffX = torch.tensor([skip.size()[3] - x.size()[3]])
-        x = F.pad(x, [diffX // 2, diffX - diffX // 2,
-                      diffY // 2, diffY - diffY // 2])
+        dx = skip.size()[2] - x.size()[2]
+        dy = skip.size()[3] - x.size()[3]
+        x = F.pad(x, [dy // 2, dy - dy // 2,
+                      dx // 2, dx - dx // 2])
         return x
 
 
@@ -75,55 +73,16 @@ class PoolFrequency(nn.Module):
     def forward(self, x):
         return self.apool(self.conv(x)).squeeze()
 
-
-class Unet(nn.Module):
-    def __init__(self, channels, classes, bilinear=True, loss_ratio=0.5):
-        super(Unet, self).__init__()
-        self.channels = channels
-        self.classes = classes
-        self.bilinear = bilinear
-
-        self.inc = DoubleConv(channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        self.down4 = Down(512, 512)
-        self.up1 = Up(1024, 256, bilinear)
-        self.up2 = Up(512, 128, bilinear)
-        self.up3 = Up(256, 64, bilinear)
-        self.up4 = Up(128, 64, bilinear)
-        self.outc = OutConv(64, classes)
-        self.apool = PoolFrequency(classes, classes)
-
-        self.criterion = PooledSegmentationLoss(llambda=loss_ratio)
-        self.metric = SegmentationMetrics
-
-    def forward(self, batch):
-        enc1 = self.inc(batch['audio'])
-        enc2 = self.down1(enc1)
-        enc3 = self.down2(enc2)
-        enc4 = self.down3(enc3)
-        x = self.down4(enc4)
-        x = self.up1(x, enc4)
-        x = self.up2(x, enc3)
-        x = self.up3(x, enc2)
-        x = self.up4(x, enc1)
-        x = self.apool(self.outc(x))
-        x = torch.sigmoid(x)
-        return {'target': x}
-
-
 class TinyUnet(nn.Module):
-    def __init__(self, num_filters, channels=1, classes=1, bilinear=True, loss_ratio=0.5, **kwargs):
+    def __init__(self, num_filters, channels=1, classes=1, dropout_ratio=0.001, bilinear=True, loss_ratio=0.5,
+                 **kwargs):
         super(TinyUnet, self).__init__()
         self.channels = channels
         self.classes = classes
         self.bilinear = bilinear
 
-        self.do = nn.Dropout2d(p=0.001)
+        self.do = nn.Dropout2d(p=dropout_ratio)
         d = num_filters
-        # d = [16, 32, 64]
-        # d = [8, 16, 32]
         self.inc = DoubleConv(channels, d[0])
         self.down1 = Down(d[0], d[1])
         self.down2 = Down(d[1], d[2])

@@ -57,7 +57,7 @@ model_catalogue = {
     'TinyTemporalTimbreCNN': TinyTemporalTimbreCNN(),
     'TinySampleCNN': TinySampleCNN(),
     'TinyConcatCNN': TinyConcatCNN(),
-    'TinyUnet': TinyUnet([4, 8, 16])
+    'TinyUnet': TinyUnet([8, 16, 32]),
 }
 
 
@@ -73,6 +73,7 @@ def main(**cfg):
     model = model_catalogue[cfg['model_name']]
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg['learning_rate'])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', factor=0.5, patience=10, verbose=True)
+    # from torch.optim.lr_scheduler import OneCycleLR
 
     ckpt_path = 'model_ckpt.pt'
     callbacks = [
@@ -123,7 +124,7 @@ if __name__ == "__main__":
         'data_path': '/Users/gabrieldernbach/git/acoustic_train_class_data/data_processed/data_resample_train_10s',
         'mixup': 0.2,
         'model_name': 'TinyUnet',
-        'subset_fraction': 0.6,
+        'subset_fraction': 0.8,
         'max_epoch': 100,
         'early_stop_patience': 20,
         'learning_rate': 0.01
