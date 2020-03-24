@@ -210,15 +210,9 @@ class Extractor:
             np.save(fname + '_target', target[i])
 
 
-def create_dataset(destination_name, resampler, framer):
-    cwd = Path.cwd()
-    import shutil
-    source = cwd.parent / 'data'
-    destination = cwd.parent / destination_name
-
-    if destination.exists():
-        print('clean up destination')
-        shutil.rmtree(destination)
+def create_dataset(source_path, destination_path, resampler, framer):
+    source = Path(source_path)
+    destination = Path(destination_path)
 
     print('indexing source files')
     source_paths = list(source.rglob('*.aup'))
@@ -228,13 +222,3 @@ def create_dataset(destination_name, resampler, framer):
     print('extracting to disk')
     extractor = Extractor(destination, resampler, framer)
     Parallel(4, verbose=10)(delayed(extractor)(r) for _, r in register.iterrows())
-
-
-if __name__ == "__main__":
-    sr = 8192
-
-    resampler = ResampleTrainSpeed(sr, target_train_speed=14)
-    framer = Frame(sr * 5, sr * 5)
-
-    create_dataset('data_resample_train_5s', resampler, framer)
-

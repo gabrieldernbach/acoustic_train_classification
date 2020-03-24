@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from main.extract import ResampleTrainSpeed, Frame
 from main.extract import load_audio, load_target, load_axle, load_train_speed, load_wheel_diameter
+from main.models.unet import TinyUnet
 
 """
 Collect Observation
@@ -56,8 +57,8 @@ Define Predicitor
 class Predictor:
     def __init__(self, model_path, resampler, framer, batch_size, num_workers):
         checkpoint = torch.load(model_path)
-        from main.models.unet import TinyUnet
-        self.model = TinyUnet()
+        print('initialize model')
+        self.model = TinyUnet([4, 8, 16])
         self.model.load_state_dict(checkpoint['model_parameters'])
         self.model.eval()
 
@@ -68,6 +69,7 @@ class Predictor:
         self.num_workers = num_workers
 
     def __call__(self, f):
+        print(f'expand and cut {f["file_name"]}')
         audio = self.resampler.down(f['audio'], f)
         frames = self.framer.split(audio)
 
@@ -77,28 +79,35 @@ class Predictor:
 
         with torch.no_grad():
             outs = []
-            for d in tqdm(dl):
-                out = self.model({'audio': d})
-                outs.append(out['target'])
+            for d in tqdm(dl, desc='applying model'):
+                out = self.model({'audio': d})['target']
+                outs.append(out)
 
-            out = torch.cat(outs)
+            out = torch.stack(outs)
             out = out.detach().numpy()
-            out = out.mean(axis=-1)
+            out = expand(out)
+            out = out.flatten()[:audio.size]
 
-        out = self.resampler.up(self.framer.join(out, len(audio)), f)
+        out = self.resampler.up(out, f)
         return out
+
+
+def expand(out):
+    fun = lambda x: np.interp(np.linspace(0, len(x), 40960), np.arange(0, len(x)), x)
+    if len(out.shape) > 1:
+        out = np.apply_along_axis(fun, 1, out)
+    else:
+        out = fun(out)
+    return out
+
+
+def write_to_csv(fname, prediction):
+    np.savetxt(fname, (prediction * 255).astype('uint8'), fmt='$3u')
 
 
 """
 Visualize Results
 """
-
-
-def plot_batch(samples):
-    samples = samples.numpy()
-    for i in range(len(samples)):
-        plt.imshow(samples[i, 0, :, :], vmin=-5, vmax=+5)
-        plt.show()
 
 
 def plot(f):
@@ -111,21 +120,25 @@ def plot(f):
     n = len(f['out'])
     x = np.linspace(0, n / 48000, n) / 60
     plt.plot(x, f['out'])
+
+    plt.title('file_name', f['file_name'])
+    plt.xlabel('time in seconds')
+    plt.ylabel('flat spot score')
     plt.show()
 
 
 if __name__ == "__main__":
-    root = '/Users/gabrieldernbach/git/acoustic_train_class/data/'
+    root = '/Users/gabrieldernbach/git/acoustic_train_class_data/data'
     root = pathlib.Path(root)
     paths = list(root.rglob('*.aup'))
 
     predictor = Predictor(model_path='model.pt',
                           resampler=ResampleTrainSpeed(target_fs=8192, target_train_speed=14),
-                          framer=Frame(frame_length=16384, hop_length=4096),
-                          batch_size=16,
+                          framer=Frame(frame_length=5 * 8192, hop_length=5 * 8192),
+                          batch_size=1,
                           num_workers=4)
 
-    for i in range(10):
+    for i in range(0, 10):
         print('predicting train', i)
         f = load_file(paths[i + 100])
         f['out'] = predictor(f)
