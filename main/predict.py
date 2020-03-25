@@ -121,10 +121,13 @@ def plot(f):
     x = np.linspace(0, n / 48000, n) / 60
     plt.plot(x, f['out'], label='flat spot score (predicted)')
 
+    axles = (f['axle'].WaveTimestampInSeconds / 60).values
+    [plt.axvline(axle, color='C4', alpha=0.5, lw=0.5) for axle in axles]
+
     plt.title(f'file_name {f["file_name"]}')
     plt.xlabel('time in minutes')
     plt.ylabel('flat spot score')
-    plt.legend()
+    plt.legend(loc='upper left')
     plt.savefig(f'/Users/gabrieldernbach/git/acoustic_train_class_data/predictions2/{f["file_name"]}.png')
     plt.show()
 
@@ -140,8 +143,11 @@ if __name__ == "__main__":
                           batch_size=1,
                           num_workers=4)
 
-    for i in range(35, 200):
-        print('predicting train', i)
-        f = load_file(paths[i + 100])
-        f['out'] = predictor(f)
-        plot(f)
+    for i in range(0, 200):
+        try:
+            print('predicting train', i)
+            f = load_file(paths[i + 100])
+            f['out'] = predictor(f)
+            plot(f)
+        except:
+            print('error writing')

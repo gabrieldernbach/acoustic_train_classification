@@ -21,9 +21,9 @@ train_tfs = {
     'audio': Compose([
         ToTensor(),
         transforms.MelSpectrogram(sample_rate=8192, n_fft=512, hop_length=128, n_mels=40),
-        LogCompress(ratio=1),
-        transforms.TimeMasking(4),
-        transforms.FrequencyMasking(4),
+        LogCompress(ratio=7),
+        transforms.TimeMasking(5),
+        transforms.FrequencyMasking(16),
         TorchUnsqueeze()
     ]),
     'target': Compose([
@@ -57,7 +57,7 @@ model_catalogue = {
     'TinyTemporalTimbreCNN': TinyTemporalTimbreCNN(),
     'TinySampleCNN': TinySampleCNN(),
     'TinyConcatCNN': TinyConcatCNN(),
-    'TinyUnet': TinyUnet([8, 16, 32]),
+    'TinyUnet': TinyUnet([16, 32, 64]),
 }
 
 
@@ -71,7 +71,7 @@ def main(**cfg):
 
     print('init model')
     model = model_catalogue[cfg['model_name']]
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg['learning_rate'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg['learning_rate'], weight_decay=0.004)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', factor=0.5, patience=10, verbose=True)
     # from torch.optim.lr_scheduler import OneCycleLR
 
