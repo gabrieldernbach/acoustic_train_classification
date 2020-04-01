@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,36 +10,48 @@ from main.loss import PooledSegmentationLoss
 class ConvBlock(nn.Module):
     def __init__(self, ins, outs):
         super(ConvBlock, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(ins, outs, kernel_size=3, padding=1),
-            nn.BatchNorm2d(outs),
-            nn.ELU(inplace=True),
-        )
+
+        ratios = [2, 3, 6]
+        filters = self.robust_split(ratios, outs)
+
+        self.conv1 = nn.Conv2d(ins, filters[0], kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(filters[0], filters[1], kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(filters[1], filters[2], kernel_size=3, padding=1)
+        self.skip = nn.Conv2d(ins, outs, kernel_size=1)
 
     def forward(self, x):
-        return self.conv(x)
+        x1 = self.conv1(x)
+        x2 = self.conv2(x1)
+        x3 = self.conv3(x2)
+        x = torch.cat([x1, x2, x3], 1) + self.skip(x)
+        return x
+
+    def robust_split(self, ratios, n):
+        ratios = ratios / np.sum(ratios)
+        filt = ratios * n
+
+        # robust rounding that ensures the split sums to n
+        filt = np.cumsum(filt)
+        filt = np.round(filt).astype(int)
+        filt = np.diff(np.insert(filt, 0, 0))
+        assert (filt.sum() == n)
+        return filt
 
 
 class Down(nn.Module):
     def __init__(self, ins, outs):
         super(Down, self).__init__()
-        self.mp_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            ConvBlock(ins, outs)
-        )
+        self.mp = nn.MaxPool2d(2)
+        self.conv = ConvBlock(ins, outs)
 
     def forward(self, x):
-        return self.mp_conv(x)
+        return self.mp(self.conv(x))
 
 
 class Up(nn.Module):
-    def __init__(self, ins, outs, bilinear=True):
+    def __init__(self, ins, outs):
         super(Up, self).__init__()
-        if bilinear:
-            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        else:
-            self.up = nn.ConvTranspose2d(ins // 2, ins // 2, kernel_size=2, stride=2)
-
+        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.conv = ConvBlock(ins, outs)
 
     def forward(self, x, skip):
@@ -74,10 +87,10 @@ class PoolFrequency(nn.Module):
         return self.apool(self.conv(x)).squeeze()
 
 
-class TinyUnet(nn.Module):
+class MultiResUnet(nn.Module):
     def __init__(self, num_filters, channels=1, classes=1, dropout_ratio=0.001, bilinear=True, loss_ratio=0.5,
                  **kwargs):
-        super(TinyUnet, self).__init__()
+        super(MultiResUnet, self).__init__()
         self.channels = channels
         self.classes = classes
         self.bilinear = bilinear
@@ -88,9 +101,9 @@ class TinyUnet(nn.Module):
         self.down1 = Down(d[0], d[1])
         self.down2 = Down(d[1], d[2])
         self.down3 = Down(d[2], d[2])
-        self.up1 = Up(d[2] + d[2], d[1], bilinear)
-        self.up2 = Up(d[1] + d[1], d[0], bilinear)
-        self.up3 = Up(d[0] + d[0], d[0], bilinear)
+        self.up1 = Up(d[2] + d[2], d[1])
+        self.up2 = Up(d[1] + d[1], d[0])
+        self.up3 = Up(d[0] + d[0], d[0])
         self.outc = OutConv(d[0], classes)
         self.apool = PoolFrequency(classes, classes)
 
@@ -115,7 +128,8 @@ if __name__ == "__main__":
         'audio': torch.randn(20, 1, 40, 321),
         'target': torch.rand(20, 321).float()
     }
-    model = TinyUnet(num_filters=[16, 32, 64])
+    model = MultiResUnet(num_filters=[4, 8, 16])
+    print(model)
     outs = model(batch)
 
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

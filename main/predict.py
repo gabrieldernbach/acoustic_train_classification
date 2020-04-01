@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from main.extract import ResampleTrainSpeed, Frame
 from main.extract import load_audio, load_target, load_axle, load_train_speed, load_wheel_diameter
-from main.models.unet import TinyUnet
+from main.models.unet_temporal_timbre import TTUNet
 
 """
 Collect Observation
@@ -58,7 +58,7 @@ class Predictor:
     def __init__(self, model_path, resampler, framer, batch_size, num_workers):
         checkpoint = torch.load(model_path)
         print('initialize model')
-        self.model = TinyUnet([8, 16, 32])
+        self.model = TTUNet([8, 16, 32])
         self.model.load_state_dict(checkpoint['model_parameters'])
         self.model.eval()
 
@@ -81,7 +81,7 @@ class Predictor:
             outs = []
             for d in tqdm(dl, desc='applying model'):
                 out = self.model({'audio': d})['target']
-                outs.append(out)
+                outs.append(out.squeeze())
 
             out = torch.stack(outs)
             out = out.detach().numpy()
@@ -128,7 +128,7 @@ def plot(f):
     plt.xlabel('time in minutes')
     plt.ylabel('flat spot score')
     plt.legend(loc='upper left')
-    plt.savefig(f'/Users/gabrieldernbach/git/acoustic_train_class_data/predictions2/{f["file_name"]}.png')
+    # plt.savefig(f'/Users/gabrieldernbach/git/acoustic_train_class_data/predictions2/{f["file_name"]}.png')
     plt.show()
 
 
@@ -144,10 +144,7 @@ if __name__ == "__main__":
                           num_workers=4)
 
     for i in range(0, 200):
-        try:
-            print('predicting train', i)
-            f = load_file(paths[i + 100])
-            f['out'] = predictor(f)
-            plot(f)
-        except:
-            print('error writing')
+        print('predicting train', i)
+        f = load_file(paths[i + 100])
+        f['out'] = predictor(f)
+        plot(f)

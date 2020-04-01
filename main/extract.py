@@ -9,7 +9,6 @@ from uuid import uuid4
 import librosa
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
 from tqdm import tqdm
 
 """
@@ -221,4 +220,5 @@ def create_dataset(source_path, destination_path, resampler, framer):
 
     print('extracting to disk')
     extractor = Extractor(destination, resampler, framer)
-    Parallel(4, verbose=10)(delayed(extractor)(r) for _, r in register.iterrows())
+    # Parallel(4, verbose=10)(delayed(extractor)(r) for _, r in register.iterrows())
+    [extractor(r) for _, r in tqdm(register.iterrows())]

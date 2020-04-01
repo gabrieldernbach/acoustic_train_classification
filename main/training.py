@@ -1,14 +1,13 @@
 """
 Specify Model Training Run
 """
-from pathlib import Path
 
 import torch.backends.cudnn
 from torchaudio import transforms
 
 from main.augment import ToTensor, Compose, TorchUnsqueeze, LogCompress, ShortTermAverageTransform
 from main.callback import SaveCheckpoint, Mixup, SchedulerWrap, EarlyStopping
-from main.extract import ResampleTrainSpeed, Frame, create_dataset
+from main.extract import ResampleTrainSpeed, Frame
 from main.learner import Learner
 from main.load import fetch_dataloaders, build_register, train_dev_test
 
@@ -51,13 +50,17 @@ from main.models.temporal_timbre_net import TinyTemporalTimbreCNN
 from main.models.sample_net import TinySampleCNN
 from main.models.concat_net import TinyConcatCNN
 from main.models.unet import TinyUnet
+from main.models.multiresunet import MultiResUnet
+from main.models.unet_temporal_timbre import TTUNet
 
 model_catalogue = {
     'TinyCNN': TinyCNN(),
     'TinyTemporalTimbreCNN': TinyTemporalTimbreCNN(),
     'TinySampleCNN': TinySampleCNN(),
     'TinyConcatCNN': TinyConcatCNN(),
-    'TinyUnet': TinyUnet([16, 32, 64]),
+    'TinyUnet': TinyUnet([8, 16, 32]),
+    'MultiResUnet': MultiResUnet([16, 32, 64]),
+    'TTUNet': TTUNet([8, 16, 32])
 }
 
 
@@ -73,7 +76,6 @@ def main(**cfg):
     model = model_catalogue[cfg['model_name']]
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg['learning_rate'], weight_decay=0.004)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', factor=0.5, patience=10, verbose=True)
-    # from torch.optim.lr_scheduler import OneCycleLR
 
     ckpt_path = 'model_ckpt.pt'
     callbacks = [
@@ -113,21 +115,21 @@ if __name__ == "__main__":
 
     resampler = ResampleTrainSpeed(fs, target_train_speed=14)
     framer = Frame(frame_length=5 * fs, hop_length=5 * fs)
-    if not Path(destination).exists():
-        create_dataset(source, destination, framer=framer, resampler=resampler)
+    # create_dataset(source, destination, framer=framer, resampler=resampler)
 
     """
     Configure and train model
     """
 
+
     learn_config = {
         'data_path': '/Users/gabrieldernbach/git/acoustic_train_class_data/data_processed/data_resample_train_10s',
         'mixup': 0.2,
-        'model_name': 'TinyUnet',
+        'model_name': 'TTUNet',
         'subset_fraction': 0.8,
         'max_epoch': 100,
         'early_stop_patience': 20,
-        'learning_rate': 0.01
+        'learning_rate': 0.0001
     }
 
     res = main(**learn_config)
