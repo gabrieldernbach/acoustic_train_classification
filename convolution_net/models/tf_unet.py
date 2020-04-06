@@ -131,14 +131,14 @@ class TFUNet(nn.Module):
             residual.append(x)
 
         for residual, layer in zip(reversed(residual), self.decoder):
-            x = self.pad_match(x, residual)
+            x = self.pad2match(x, residual)
             x = torch.cat((residual, x), 1)
             x = layer(x)
 
         x = torch.sigmoid(self.outs(x)).squeeze()
         return {'target': x}
 
-    def pad_match(self, x, residual):
+    def pad2match(self, x, residual):
         if x.shape != residual.shape:
             h = residual.shape[2] - x.shape[2]
             w = residual.shape[3] - x.shape[3]

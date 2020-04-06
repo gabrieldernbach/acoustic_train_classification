@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from joblib import Parallel, delayed
 from sklearn.model_selection import GroupShuffleSplit
 from torch import tensor
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -30,6 +29,7 @@ def build_register(root):
     register = pd.DataFrame([path2entry(p) for p in tqdm(source_paths)])
 
     print('label encode')
+    register['file_id'] = register.file_name.astype('category').cat.codes
     register['station_id'] = register.station.astype('category').cat.codes
     register['speed_id'] = register.speed_bucket.astype('category').cat.codes
     return register
@@ -48,7 +48,7 @@ def train_dev_test(register, subset_fraction=1.0, random_state=5):
     return {'train': train, 'dev': dev, 'test': test}
 
 
-class HddDataset(Dataset):
+class RailWatchDataset(Dataset):
     def __init__(self, register, transform=None):
         self.register = register
         self.transform = transform
@@ -62,31 +62,6 @@ class HddDataset(Dataset):
         out['audio'] = self.transform['audio'](audio)
         out['target'] = self.transform['target'](target)
 
-        out['station_id'] = torch.tensor(row.station_id).long()
-        out['speed_id'] = torch.tensor(row.speed_id).long()
-
-        return out
-
-    def __len__(self):
-        return len(self.register)
-
-
-class MemDataset(Dataset):
-    def __init__(self, register, transform=None):
-        self.register = register
-        self.transform = transform
-
-        audio = Parallel(n_jobs=4, verbose=10)([delayed(np.load)(p) for p in self.register.audio_path.values])
-        target = Parallel(n_jobs=4, verbose=10)([delayed(np.load)(p) for p in self.register.target_path.values])
-        self.audio = np.array(audio)
-        self.target = np.array(target)
-
-    def __getitem__(self, item):
-        row = self.register.iloc[item]
-        out = {}
-
-        out['audio'] = self.transform['audio'](self.audio[item])
-        out['target'] = self.transform['target'](self.target[item])
         out['station_id'] = torch.tensor(row.station_id).long()
         out['speed_id'] = torch.tensor(row.speed_id).long()
 
@@ -132,18 +107,17 @@ def infer_stats(data_loader, slide_treshold):
     return normalizer, sampler
 
 
-def fetch_dataloaders(registers, dl_args, train_tfs, dev_tfs, slide_threshold, load_in_memory=False):
+def fetch_dataloaders(registers, dl_args, train_tfs, dev_tfs, slide_threshold):
     # infer normalization
-    tmp_set = HddDataset(registers['train'], transform=train_tfs)
+    tmp_set = RailWatchDataset(registers['train'], transform=train_tfs)
     normalizer, sampler = infer_stats(DataLoader(tmp_set, **dl_args), slide_threshold)
     train_tfs['audio'].transforms.append(normalizer)
     dev_tfs['audio'].transforms.append(normalizer)
 
     # setup data set
-    Dset = MemDataset if load_in_memory else HddDataset
-    train_set = Dset(registers['train'], transform=train_tfs)
-    dev_set = Dset(registers['dev'], transform=dev_tfs)
-    test_set = Dset(registers['test'], transform=dev_tfs)
+    train_set = RailWatchDataset(registers['train'], transform=train_tfs)
+    dev_set = RailWatchDataset(registers['dev'], transform=dev_tfs)
+    test_set = RailWatchDataset(registers['test'], transform=dev_tfs)
 
     # build dataloaders
     train_dl = DataLoader(train_set, **dl_args, sampler=sampler)

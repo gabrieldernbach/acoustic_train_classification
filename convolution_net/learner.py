@@ -13,11 +13,12 @@ def plot_batch(samples):
 
 class Learner:
 
-    def __init__(self, model, optimizer, callbacks=None):
+    def __init__(self, model, optimizer, scheduler, callbacks=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # self.model, self.optimizer = amp.initialize(model.to(self.device), optimizer, opt_level='01')
         self.model = model.to(self.device)
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.criterion = self.model.criterion
         self.cb = CallbackHandler(callbacks)
 
@@ -32,8 +33,9 @@ class Learner:
             self.cb.on_epoch_begin(learner=self)
 
             self.train(train_loader)
-            self.validate(validation_loader)
+            val_score = self.validate(validation_loader)
 
+            self.scheduler.step(val_score['f1pos'])
             self.cb.on_epoch_end(learner=self)
             if self.stop:
                 break
@@ -76,6 +78,6 @@ class Learner:
         checkpoint = torch.load(path)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        self.cb['SchedulerWrap'] = checkpoint['lr_scheduler']
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.start_epoch = checkpoint['epoch']
         print(f'resuming from epoch {self.start_epoch}')

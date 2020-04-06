@@ -260,19 +260,24 @@ class SchedulerWrap(Callback):
         self.scheduler = scheduler
 
     def on_epoch_end(self, learner, **kwargs):
+        print(self.scheduler.best)
         self.scheduler.step(learner.val_score)
+        print(self.scheduler.best)
 
 
+from pathlib import Path
 class SaveCheckpoint(Callback):
     def __init__(self, path):
         self.best_score = 0
         self.path = path
         self.model = None
         self.optimizer = None
+        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
 
     def on_fit_begin(self, learner, **kwargs):
         self.model = learner.model
         self.optimizer = learner.optimizer
+        self.scheduler = learner.scheduler
 
     def on_epoch_end(self, learner, **kwargs):
         if learner.val_score >= self.best_score:
@@ -280,10 +285,10 @@ class SaveCheckpoint(Callback):
             print(f'saving checkpoint to {self.path}')
 
             torch.save({
-                'epoch': learner.epoch,
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
-                'lr_scheduler': learner.cb['SchedulerWrap'],
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'epoch': learner.epoch,
                 'val_score': learner.val_score},
                 self.path)
 

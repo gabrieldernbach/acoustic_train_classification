@@ -3,43 +3,90 @@ Generate exploratory information about the provided dataset,
 such as how many files, their play time, and the extent to which we can find labels.
 """
 
-import os
+import xml.etree.ElementTree as ElementTree
+from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from librosa.core import get_duration
+from tqdm import tqdm
 
-from data.data_build_register import extract_aup
+
+def read_aup(aup_path):
+    audio_path = aup_path.with_suffix('.wav')
+    csv_path = aup_path.with_suffix('.csv')
+    doc = ElementTree.parse(aup_path)
+    root = doc.getroot()
+
+    # load wave file
+    xml_wave = r'{http://audacity.sourceforge.net/xml/}wavetrack'
+    name = root.find(xml_wave).attrib['name']
+
+    # extract targets
+    xml_target = r'{http://audacity.sourceforge.net/xml/}label'
+    marks = []
+    for element in root.iter(xml_target):
+        start = element.attrib['t']
+        end = element.attrib['t1']
+        marks.append((start, end))
+    detection = (len(marks) > 0)
+
+    # extract speed and diameter
+    file = pd.read_csv(csv_path, sep=';', decimal=',', dtype=np.float32)
+
+    speed = file.speedInMeterPerSeconds.mean()
+
+    diameter = file.DiameterInMM / 1_000  # convert to meter
+    diameter[diameter == 0] = np.NaN
+    diameter.ffill(inplace=True)
+    diameter = diameter.mean()
+
+    entry = {
+        'marks': marks,
+        'speed': speed,
+        'detection': detection,
+        'diameter': diameter,
+    }
+
+    return entry
+
 
 # collect all wav files
-cwd = os.getcwd()
-stations = filter(os.path.isdir, os.listdir(cwd))
-stations = [f for f in stations if not f.startswith('.')]
+# cwd = os.getcwd()
+data_path = Path('/Users/gabrieldernbach/git/acoustic_train_class_data/data')
+project_paths = list(data_path.rglob('*.aup'))
+print(f'found {len(project_paths)} train passings with annotation')
 
-audio_paths = []
-for station in stations:
-    data_path = f'{cwd}/{station}'
-    files = os.listdir(data_path)
-    wav_names = [f for f in files if f.endswith('.wav')]
-    wav_paths = [f'{data_path}/{f}' for f in wav_names]
-    audio_paths.extend(wav_paths)
+durations = [get_duration(filename=str(p.with_suffix('.wav'))) for p in project_paths]
+print(f'their joint play time amounts to {sum(durations) / 60 / 60:.2f}')
+sns.distplot(pd.Series(durations, name='distribution of drive by durations in minutes') / 60, rug=True, kde=True,
+             hist=False,
+             kde_kws={'shade': True},
+             rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+plt.savefig('drivebydurations.svg', format='svg', dpi=300)
+plt.savefig('drivebydurations.pdf', format='pdf', dpi=300)
+plt.show()
 
-print(f'we found {len(audio_paths)} audio files in total')
-lens = [get_duration(filename=f) for f in audio_paths]
-print(f'their total play time amounts to {sum(lens) / 60 / 60:.2f} hours')
+meta = pd.DataFrame([read_aup(p) for p in tqdm(project_paths)])
+print('number of train passings with at least one mark', sum(meta.detection))
+print('number of marked regions', sum([len(m) for m in meta.marks]))
 
-# collect all aup files
-labeled_data = []
-for station in stations:
-    data_path = f'{cwd}/{station}'
-    files = os.listdir(data_path)
-    audacity_projects = [f for f in files if f.endswith('.aup')]
-    project_paths = [f'{data_path}/{aup}' for aup in audacity_projects]
-    station_data = [extract_aup(i, data_path, station, verbose=0) for i in project_paths]
-    labeled_data.extend(station_data)
+mark_durs = [float(m[1]) - float(m[0]) for marks in meta.marks for m in marks]
+print('total duration of annotated flat spot', sum(mark_durs) / 60)
+sns.distplot(pd.Series(mark_durs, name='distribution of flat spot durations in seconds'), rug=True, kde=True,
+             hist=False,
+             kde_kws={'shade': True},
+             rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+plt.savefig('flatspotdurations.svg', format='svg', dpi=300)
+plt.savefig('flatspotdurations.pdf', format='pdf', dpi=300)
+plt.show()
 
-print(f'{len(labeled_data)} instances have labels provided')
-
-# infer amount of detections
-labeled_lens = [get_duration(filename=f[1]) for f in labeled_data]
-print(f"their total play time amounts to {sum(labeled_lens) / 60 / 60}")
-number_detections = sum([f[3] for f in labeled_data])
-print(f"{number_detections / len(labeled_data):.2f} % of labeled data show at least one flat spot")
+sns.distplot(pd.Series(meta.speed, name='distribution of speed of passing trains in km/h') * 3.6, rug=True, kde=True,
+             hist=False,
+             kde_kws={'shade': True},
+             rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+plt.savefig('trainspeeds.svg', format='svg', dpi=300)
+plt.savefig('trainspeeds.pdf', format='pdf', dpi=300)
+plt.show()

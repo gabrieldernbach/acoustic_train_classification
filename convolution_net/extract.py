@@ -206,15 +206,14 @@ class Extractor:
             np.save(fname + '_target', target[i])
 
 
-def create_dataset(destination_name, resampler, framer):
-    cwd = Path.cwd()
-    import shutil
-    source = cwd.parent / 'data'
-    destination = cwd.parent / destination_name
+def create_dataset(source_path, destination_path, resampler, framer):
+    source = Path(source_path)
+    destination = Path(destination_path)
 
-    if destination.exists():
-        print('clean up destination')
-        shutil.rmtree(destination)
+    # import shutil
+    # if destination.exists():
+    #     print('clean up destination')
+    #     shutil.rmtree(destination)
 
     print('indexing source files')
     source_paths = list(source.rglob('*.aup'))
