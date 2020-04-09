@@ -35,10 +35,19 @@ class PitchShift(object):
         self.n_steps = pitch_shift_range_cent
 
     def __call__(self, sample):
-        n_steps = np.random.randint(-self.n_steps, self.n_steps)
+        n_steps = float(np.random.randint(-self.n_steps, self.n_steps))
 
         sample = pitch_shift(sample, self.sr, n_steps, self.bins_per_octave, self.res_type)
         return sample
+
+
+class AdditiveNoise(object):
+    def __init__(self, sigma=0.1):
+        self.sigma = sigma
+
+    def __call__(self, sample):
+        noise = np.random.randn(*sample.shape).astype('float32') * self.sigma
+        return sample + noise
 
 
 class MelSpectrogram(object):

@@ -10,14 +10,16 @@ result_path = Path('experiment_runs/')
 data = pd.concat([pd.read_csv(p) for p in result_path.glob('*.csv')])
 data['dataset'] = data['dataset'].replace('trainpseed_5sec', 'trainspeed_5sec')
 data = data.sort_values('dataset')
-print(data)
 
-sns.catplot(x='dataset', y='f1pos', data=data[data['phase'] == 'dev'])
+chart = sns.boxplot(x='dataset', y='f1pos', data=data[data['phase'] == 'test'])
+chart.set_ylim(0.5, 0.9)
+plt.title('samplecnn - test set f1')
 plt.xticks(rotation=30, horizontalalignment='right', fontweight='light')
+plt.tight_layout()
+
+plt.savefig('samplecnn.svg', format='svg', dpi=300)
+plt.savefig('samplecnn.pdf', format='pdf', dpi=300)
 plt.show()
 
-sns.catplot(x='dataset', y='f1pos', data=data[data['phase'] == 'test'])
-plt.xticks(rotation=30, horizontalalignment='right', fontweight='light')
-plt.show()
-
+print(data[data.phase == 'test'].sort_values('f1pos'))
 print(data[data['phase'] == 'test'].sort_values('f1pos').iloc[-1])

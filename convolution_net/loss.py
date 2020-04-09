@@ -33,8 +33,8 @@ class PooledSegmentationLoss:
         segmentation_loss = self.criterion(out, batch)
 
         classification_loss = self.criterion(
-            (out.mean(dim=-1) > 0.125).float(),
-            (batch.mean(dim=-1) > 0.125).float()
+            (out.mean(dim=-1) > 0.05).float(),
+            (batch.mean(dim=-1) > 0.05).float()
         )
 
         loss = self.llambda * segmentation_loss + (1 - self.llambda) * classification_loss

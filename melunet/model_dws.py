@@ -10,22 +10,35 @@ class ConvBlock(nn.Module):
     def __init__(self, ins, outs, sample_mode, p=0.1):
         super(ConvBlock, self).__init__()
 
+        hidden = 6 * outs
+        self.conv = nn.Sequential(
+            nn.Conv2d(ins, hidden, kernel_size=1, bias=False),
+            nn.BatchNorm2d(hidden),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(hidden, hidden, kernel_size=3, padding=1, bias=False, groups=hidden),
+            nn.BatchNorm2d(hidden),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(hidden, outs, kernel_size=1, bias=False),
+            nn.BatchNorm2d(outs),
+        )
+
+        self.skip = nn.Conv2d(ins, outs, kernel_size=1)
+
         resample = nn.ModuleDict({
             'none': nn.Identity(),
-            'up': nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            'up': nn.ConvTranspose2d(outs, outs, kernel_size=3),
             'down': nn.MaxPool2d(2, 2),
         })
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(ins, outs, kernel_size=3, padding=1),
-            nn.BatchNorm2d(outs),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=p),
+        self.resample = nn.Sequential(
             resample[sample_mode],
+            nn.Dropout(p=p)
         )
 
     def forward(self, x):
-        return self.conv(x)
+        return self.resample(self.conv(x) + self.skip(x))
 
 
 class PoolFrequency(nn.Module):
@@ -53,7 +66,7 @@ class Unet(nn.Module):
         )
         self.decoder = nn.ModuleList(
             [ConvBlock(i * 2, o, 'up', p=p) for i, o in fup] +
-            [ConvBlock(fn[0] * 2, 8, 'none', p=p)]
+            [ConvBlock(fn[0] * 2, 8, 'none', p=0)]
         )
 
         self.poolfreq = PoolFrequency(8, outs)

@@ -6,7 +6,7 @@ from random import choice
 import pandas as pd
 from numpy.random import uniform
 
-from melcnn.experiment import experiment
+from melunet.experiment import experiment
 
 datasets = {
     'trainspeed_2sec': '/Users/gabrieldernbach/git/acoustic_train_class_data/data_processed/trainspeed_2sec',
@@ -17,6 +17,15 @@ datasets = {
     'beatfrequency_5sec': '/Users/gabrieldernbach/git/acoustic_train_class_data/data_processed/beatfrequency_5sec',
 }
 
+
+# datasets = {
+#     'trainspeed_2sec': '/home/gdernbach/projects/acoustic_train_class_data/data_processed/trainspeed_2sec',
+#     'trainpseed_5sec': '/home/gdernbach/projects/acoustic_train_class_data/data_processed/trainspeed_5sec',
+#     'subsample_2sec': '/home/gdernbach/projects/acoustic_train_class_data/data_processed/subsample_2sec',
+#     'subsample_5sec': '/home/gdernbach/projects/acoustic_train_class_data/data_processed/subsample_5sec',
+#     'beatfrequency_2sec': '/home/gdernbach/projects/acoustic_train_class_data/data_processed/beatfrequency_2sec',
+#     'beatfrequency_5sec': '/home/gdernbach/projects/acoustic_train_class_data/data_processed/beatfrequency_5sec',
+# }
 
 def gen_params():
     params = {
@@ -31,10 +40,9 @@ def gen_params():
         'max_epoch': 200,
         'dropout_ratio': uniform(0.0, 0.5),
 
+        'loss_ratio': uniform(0.1, 0.9),
         'num_filters': choice([
-            #            [2, 4, 8, 16, 32, 64],
             [16, 32, 64],
-            # [8, 16, 32, 64, 128],
         ])
     }
     params['data_path'] = datasets[params['dataset']]

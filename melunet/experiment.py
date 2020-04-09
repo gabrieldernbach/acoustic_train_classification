@@ -11,6 +11,8 @@ from convolution_net.learner import Learner
 from convolution_net.load import fetch_dataloaders, build_register, train_dev_test
 from melunet.model import Unet
 
+# from melunet.model_dws import Unet
+
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 torch.set_num_threads(4)
@@ -53,7 +55,7 @@ def experiment(**kwargs):
     dl = fetch_dataloaders(registers, dl_args, train_tfs=train_tfs, dev_tfs=dev_tfs, slide_threshold=0.05)
 
     print('init model')
-    model = Unet(num_filters=kwargs['num_filters'], p=kwargs['dropout_ratio'])
+    model = Unet(num_filters=kwargs['num_filters'], p=kwargs['dropout_ratio'], loss_ratio=kwargs['loss_ratio'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=kwargs['learning_rate'], weight_decay=kwargs['weight_decay'])
     scheduler = ReduceLROnPlateau(optimizer, 'max', factor=0.5, patience=kwargs['reduce_plateau_patience'],
                                   verbose=True)

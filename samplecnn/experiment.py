@@ -22,8 +22,12 @@ datasets = {
     'beatfrequency_5sec': '/Users/gabrieldernbach/git/acoustic_train_class_data/data_processed/beatfrequency_5sec',
 }
 
+from convolution_net.augment import AdditiveNoise
+
 train_tfs = {
     'audio': Compose([
+        # PitchShift(sr=8192, pitch_shift_range_cent=200, bins_per_octave=1_2000),
+        AdditiveNoise(sigma=0.001),
         ToTensor(),
         TorchUnsqueeze()
     ]),
@@ -51,11 +55,11 @@ def experiment(**kwargs):
                                subset_fraction=kwargs['subset_fraction'],
                                random_state=kwargs['random_state'])
 
-    dl_args = {'batch_size': 64, 'num_workers': 2, 'pin_memory': False}
+    dl_args = {'batch_size': 64, 'num_workers': 4, 'pin_memory': True}
     dl = fetch_dataloaders(registers, dl_args, train_tfs=train_tfs, dev_tfs=dev_tfs, slide_threshold=0.05)
 
     print('init model')
-    model = SampleCNN()
+    model = SampleCNN(n_filter=kwargs['n_filter'], p=kwargs['dropout_ratio'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=kwargs['learning_rate'], weight_decay=kwargs['weight_decay'])
     scheduler = ReduceLROnPlateau(optimizer, 'max', factor=0.5, patience=kwargs['reduce_plateau_patience'],
                                   verbose=True)

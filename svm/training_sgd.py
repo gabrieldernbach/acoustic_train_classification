@@ -55,11 +55,12 @@ for _ in range(1000):
         parameter_distribution = {
             'quantile': [
                 'passthrough',
-                QuantileTransformer(output_distribution='uniform'),
-                QuantileTransformer(output_distribution='normal')
+                # QuantileTransformer(output_distribution='uniform'),
+                # QuantileTransformer(output_distribution='normal')
             ],
             'sgd__loss':
-                ['hinge', 'log', 'perceptron', 'modified_huber'],
+                ['log', 'modified_huber'],
+            # ['hinge', 'log', 'perceptron', 'modified_huber'],
             'sgd__alpha':
                 loguniform(1e-7, 1e-1),
             'sgd__max_iter':
@@ -67,14 +68,17 @@ for _ in range(1000):
             'sgd__epsilon':
                 sps.uniform(0.001, 0.2),
             'sgd__class_weight':
-                ['balanced', None]
+                [
+                    'balanced',
+                    # None
+                ]
         }
 
         random_search = RandomizedSearchCV(classifier,
                                            param_distributions=parameter_distribution,
                                            n_iter=40, scoring='f1',
                                            cv=GroupKFold(n_splits=3),
-                                           verbose=2, n_jobs=4, pre_dispatch=8)
+                                           verbose=2, n_jobs=4, pre_dispatch=4)
 
         random_search.fit(X_train, Y_train, groups=G_train)
 

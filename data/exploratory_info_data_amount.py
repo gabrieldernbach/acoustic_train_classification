@@ -13,6 +13,7 @@ import seaborn as sns
 from librosa.core import get_duration
 from tqdm import tqdm
 
+sns.set_context('paper', font_scale=1.5)
 
 def read_aup(aup_path):
     audio_path = aup_path.with_suffix('.wav')
@@ -61,10 +62,13 @@ print(f'found {len(project_paths)} train passings with annotation')
 
 durations = [get_duration(filename=str(p.with_suffix('.wav'))) for p in project_paths]
 print(f'their joint play time amounts to {sum(durations) / 60 / 60:.2f}')
-sns.distplot(pd.Series(durations, name='distribution of drive by durations in minutes') / 60, rug=True, kde=True,
-             hist=False,
-             kde_kws={'shade': True},
-             rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+chart = sns.distplot(pd.Series(durations, name='distribution of drive by durations in minutes') / 60,
+                     rug=True,
+                     kde=True,
+                     hist=False,
+                     kde_kws={'shade': True},
+                     rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+chart.set(ylabel='Density')
 plt.savefig('drivebydurations.svg', format='svg', dpi=300)
 plt.savefig('drivebydurations.pdf', format='pdf', dpi=300)
 plt.show()
@@ -75,18 +79,24 @@ print('number of marked regions', sum([len(m) for m in meta.marks]))
 
 mark_durs = [float(m[1]) - float(m[0]) for marks in meta.marks for m in marks]
 print('total duration of annotated flat spot', sum(mark_durs) / 60)
-sns.distplot(pd.Series(mark_durs, name='distribution of flat spot durations in seconds'), rug=True, kde=True,
-             hist=False,
-             kde_kws={'shade': True},
-             rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+chart = sns.distplot(pd.Series(mark_durs, name='distribution of flat spot durations in seconds'),
+                     rug=True,
+                     kde=True,
+                     hist=False,
+                     kde_kws={'shade': True},
+                     rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+chart.set(ylabel='Density')
 plt.savefig('flatspotdurations.svg', format='svg', dpi=300)
 plt.savefig('flatspotdurations.pdf', format='pdf', dpi=300)
 plt.show()
 
-sns.distplot(pd.Series(meta.speed, name='distribution of speed of passing trains in km/h') * 3.6, rug=True, kde=True,
-             hist=False,
-             kde_kws={'shade': True},
-             rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+chart = sns.distplot(pd.Series(meta.speed, name='distribution of speed of passing trains in km/h') * 3.6,
+                     rug=True,
+                     kde=True,
+                     hist=False,
+                     kde_kws={'shade': True},
+                     rug_kws={'alpha': 0.5, 'linewidth': 0.5, 'height': 0.05})
+chart.set(ylabel='Density')
 plt.savefig('trainspeeds.svg', format='svg', dpi=300)
 plt.savefig('trainspeeds.pdf', format='pdf', dpi=300)
 plt.show()

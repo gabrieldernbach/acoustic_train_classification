@@ -47,7 +47,6 @@ def train_dev_test(register, subset_fraction=1.0, random_state=5):
     train, dev = group_split(remain, random_state=random_state)
     return {'train': train, 'dev': dev, 'test': test}
 
-
 class RailWatchDataset(Dataset):
     def __init__(self, register, transform=None):
         self.register = register

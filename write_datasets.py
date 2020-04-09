@@ -19,8 +19,9 @@ resampler_catalogue = {
 }
 
 framer_catalogue = {
-    '2sec': Frame(2 * sr, 2 * sr),
-    '5sec': Frame(5 * sr, 5 * sr)
+    # '2sec': Frame(2 * sr, 2 * sr),
+    # '5sec': Frame(5 * sr, 5 * sr),
+    '7sec': Frame(7 * sr, 7 * sr),
 }
 
 for sampler_name, resampler in resampler_catalogue.items():
