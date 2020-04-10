@@ -14,8 +14,19 @@ data['dataset'] = data['dataset'].replace('trainpseed_5sec', 'trainspeed_5sec')
 data = data.sort_values('dataset')
 print(data)
 
-sns.boxplot(x='dataset', y='f1', data=data)
+data.dataset = pd.Categorical(data.dataset, [
+    "subsample_2sec",
+    "trainspeed_2sec",
+    "beatfrequency_2sec",
+    "subsample_5sec",
+    "trainspeed_5sec",
+    "beatfrequency_5sec"
+])
+
+chart = sns.boxplot(x='dataset', y='f1', data=data)
 plt.xticks(rotation=30, horizontalalignment='right', fontweight='light')
+chart.set_ylim(0.3, 0.85)
+
 plt.title('svm with c=1, gamma=0.001')
 plt.show()
 

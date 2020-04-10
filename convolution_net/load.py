@@ -119,7 +119,7 @@ def fetch_dataloaders(registers, dl_args, train_tfs, dev_tfs, slide_threshold):
     test_set = RailWatchDataset(registers['test'], transform=dev_tfs)
 
     # build dataloaders
-    train_dl = DataLoader(train_set, **dl_args, sampler=sampler)
+    train_dl = DataLoader(train_set, **dl_args, sampler=sampler, drop_last=True)
     dev_dl = DataLoader(dev_set, **dl_args)
     test_dl = DataLoader(test_set, **dl_args)
 

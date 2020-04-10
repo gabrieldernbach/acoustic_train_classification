@@ -17,14 +17,14 @@ class LinearBlock(nn.Module):
 
 
 class ConvolutionBlock(nn.Module):
-    def __init__(self, ins, outs, p=0.25):
+    def __init__(self, ins, outs, p):
         super(ConvolutionBlock, self).__init__()
         self.block = nn.Sequential(
             nn.Conv2d(ins, outs, kernel_size=3, padding=1),
             nn.BatchNorm2d(outs),
             nn.ReLU(),
+            nn.MaxPool2d(2),
             nn.Dropout(p=p / 2),
-            nn.MaxPool2d(2)
         )
 
     def __call__(self, sample):
@@ -32,7 +32,7 @@ class ConvolutionBlock(nn.Module):
 
 
 class DoubleConv(nn.Module):
-    def __init__(self, ins, outs, p=0.25):
+    def __init__(self, ins, outs, p):
         super(DoubleConv, self).__init__()
 
         self.block1 = nn.Sequential(
@@ -88,39 +88,12 @@ class MelCNN(nn.Module):
         return {'target': x}
 
 
-class LargeMelCNN(nn.Module):
-    def __init__(self):
-        super(LargeMelCNN, self).__init__()
-        self.features = nn.Sequential(
-            DoubleConv(1, 32),  # 128 x 63
-            DoubleConv(32, 64),  # 64 x 31
-            DoubleConv(64, 128),  # 32 x 15
-            DoubleConv(128, 128),  # 16 x 7
-            nn.AdaptiveMaxPool2d(1),  # 8 x 3 -> 1 x 1
-            Flatten(),
-        )
-
-        self.classifier = nn.Sequential(
-            LinearBlock(128, 512),
-            LinearBlock(512, 128),
-            nn.Linear(128, 1),
-            nn.Sigmoid()
-        )
-
-        self.criterion = BCELoss()
-        self.metric = BinaryClassificationMetrics
-
-    def forward(self, batch):
-        x = self.features(batch['audio'])
-        x = self.classifier(x)
-        return {'target': x}
-
-
 if __name__ == '__main__':
     import torch
 
-    ins = torch.randn(500, 1, 40, 126)
+    batch = {'audio': torch.randn(2, 1, 40, 126)}
     model = MelCNN()
-    print(model)
+    # print(model)
+    print(model(batch).shape)
     # summary(model, input_size=(1, 40, 126))
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

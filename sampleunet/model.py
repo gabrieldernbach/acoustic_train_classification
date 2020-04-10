@@ -6,6 +6,24 @@ from convolution_net.callback import SegmentationMetrics
 from convolution_net.loss import PooledSegmentationLoss
 
 
+class SqueezeExcitation(nn.Module):
+    def __init__(self, ins):
+        super(SqueezeExcitation, self).__init__()
+        self.ap = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(ins, ins // 8, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(ins // 8, ins, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _ = x.size()
+        y = self.ap(x).view(b, c)
+        y = self.fc(y).view(b, c, 1)
+        return x * y
+
+
 class ConvBlock(nn.Module):
 
     def __init__(self, ins, outs, sample_mode, dropout):
@@ -17,7 +35,7 @@ class ConvBlock(nn.Module):
             'down': nn.MaxPool1d(kernel_size=3, stride=3),
         })
         self.resample = resample[sample_mode]
-        self.skip = nn.Conv1d(ins, outs, kernel_size=1)
+        self.skip = nn.Conv1d(ins, outs, kernel_size=1, bias=False)
 
         depth = outs * 8
         self.conv = nn.Sequential(
@@ -27,6 +45,7 @@ class ConvBlock(nn.Module):
 
             nn.Conv1d(depth, depth, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm1d(depth),
+            SqueezeExcitation(depth),
             nn.ReLU(),
 
             nn.Conv1d(depth, outs, kernel_size=1, bias=False),
@@ -34,8 +53,8 @@ class ConvBlock(nn.Module):
             nn.Dropout(p=dropout),
         )
 
-    def forward(self, sample):
-        return self.resample(self.conv(sample) + self.skip(sample))
+    def forward(self, x):
+        return self.resample(self.conv(x) + self.skip(x))
 
 
 class SampleUnet(nn.Module):
@@ -63,7 +82,6 @@ class SampleUnet(nn.Module):
 
     def forward(self, batch):
         x = batch['audio']
-        # x = batch
         residual = []
         for layer in self.encoder:
             x = layer(x)
@@ -76,7 +94,6 @@ class SampleUnet(nn.Module):
 
         x = torch.sigmoid(x).squeeze(dim=1)
         return {'target': x}
-        # return x
 
     def pad2match(self, x, skip):
         if x.shape != skip.shape:
@@ -86,12 +103,18 @@ class SampleUnet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = SampleUnet([2, 4, 8, 16, 32, 64, 128, 256], dropout=0.1)
-    # model = SampleUnet([2, 4, 8], dropout=0.1)
+    # model = SampleUnet([2, 4, 8, 16, 32, 64, 128, 256], dropout=0.1)
+    model = SampleUnet([2, 4, 8, 16, 32], dropout=0.1)
     # summary(model, input_size=(1, 40_960))
     # exit()
 
     # batch = {'audio': torch.randn(50, 1, 40_960)}
-    batch = {'audio': torch.randn(50, 1, 16_384)}
-    print(model(batch)['target'].shape)
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    batch = {'audio': torch.randn(64, 1, 16_384)}
+    with torch.autograd.profiler.profile(use_cuda=False, record_shapes=True) as prof:
+        model(batch)
+
+    prof.export_chrome_trace('here')
+    # print(prof)
+    print(prof.key_averages(group_by_input_shape=True).table(sort_by='self_cpu_time_total'))
+    # print(model(batch)['target'].shape)
+    # print(sum(p.numel() for p in model.parameters() if p.requires_grad))

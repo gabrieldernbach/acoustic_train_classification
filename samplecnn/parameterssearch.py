@@ -4,7 +4,6 @@ from pathlib import Path
 from random import choice
 
 import pandas as pd
-from numpy.random import uniform
 
 from samplecnn.experiment import experiment
 
@@ -34,10 +33,10 @@ def gen_params():
         'subset_fraction': 1.0,
         'random_state': choice([0, 1, 2]),
         'data_set_in_memory': False,
-        'learning_rate': 0.0004,  # uniform(0.0001, 0.01),
-        'weight_decay': uniform(1e-7, 1e-3),
-        'mixup_ratio': uniform(0.01, 0.4),
-        'dropout_ratio': uniform(0.01, 0.4),
+        'learning_rate': 0.0004 / 2,  # uniform(0.0001, 0.01),
+        'weight_decay': 0.0007,  # uniform(1e-7, 1e-3),
+        'mixup_ratio': 0.25,  # uniform(0.01, 0.4),
+        'dropout_ratio': 0.1,  # uniform(0.01, 0.4),
         'reduce_plateau_patience': 10,
         'early_stop_patience': 20,
 
@@ -50,12 +49,28 @@ def gen_params():
     return params
 
 
-for _ in range(1000):
-    params = gen_params()
-    uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
-    params['uid'] = uid
-    fpath = Path(f'experiment_runs/{uid}.csv')
+# for _ in range(1000):
+#     params = gen_params()
+#     uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
+#     params['uid'] = uid
+#     fpath = Path(f'experiment_runs/{uid}.csv')
+#
+#     res = experiment(**params)
+#     res = [{**r, **params} for r in res]
+#     pd.DataFrame(res).to_csv(fpath)
 
-    res = experiment(**params)
-    res = [{**r, **params} for r in res]
-    pd.DataFrame(res).to_csv(fpath)
+# three fold cross validation
+for dataset, dataset_path in datasets.items():
+    for random_state in [0, 1, 2]:
+        params = gen_params()
+        params['dataset'] = dataset
+        params['data_path'] = dataset_path
+        params['random_state'] = random_state
+
+        uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
+        params['uid'] = uid
+        fpath = Path(f'experiment_runs/{uid}.csv')
+
+        res = experiment(**params)
+        res = [{**r, **params} for r in res]
+        pd.DataFrame(res).to_csv(fpath)

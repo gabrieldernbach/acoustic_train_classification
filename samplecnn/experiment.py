@@ -55,7 +55,7 @@ def experiment(**kwargs):
                                subset_fraction=kwargs['subset_fraction'],
                                random_state=kwargs['random_state'])
 
-    dl_args = {'batch_size': 64, 'num_workers': 4, 'pin_memory': True}
+    dl_args = {'batch_size': 32, 'num_workers': 4, 'pin_memory': True}
     dl = fetch_dataloaders(registers, dl_args, train_tfs=train_tfs, dev_tfs=dev_tfs, slide_threshold=0.05)
 
     print('init model')

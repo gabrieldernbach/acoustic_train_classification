@@ -10,96 +10,49 @@ class Flatten(nn.Module):
         return sample.view(sample.size(0), -1)
 
 
-class ConvBlock(nn.Module):
-    def __init__(self, ins, outs):
-        super(ConvBlock, self).__init__()
-        self.block = nn.Sequential(
-            nn.Conv1d(ins, outs, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm1d(outs),
-            nn.ReLU(),
-            nn.MaxPool1d(kernel_size=3, stride=3)
+class SqueezeExcitation(nn.Module):
+    def __init__(self, ins):
+        super(SqueezeExcitation, self).__init__()
+        self.ap = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(ins, ins // 8, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(ins // 8, ins, bias=False),
+            nn.Sigmoid()
         )
 
-    def forward(self, sample):
-        return self.block(sample)
+    def forward(self, x):
+        b, c, _ = x.size()
+        y = self.ap(x).view(b, c)
+        y = self.fc(y).view(b, c, 1)
+        return x * y
 
 
-class DwsBlock(nn.Module):
+class ConvBlock(nn.Module):
     def __init__(self, ins, outs, p):
-        super(DwsBlock, self).__init__()
+        super(ConvBlock, self).__init__()
 
-        depth = outs * 6
-        self.block = nn.Sequential(
-            nn.Conv1d(ins, depth, kernel_size=1),
+        self.mp = nn.MaxPool1d(kernel_size=3, stride=3)
+        self.skip = nn.Conv1d(ins, outs, kernel_size=1, bias=False)
+
+        depth = outs * 8
+        self.conv = nn.Sequential(
+            nn.Conv1d(ins, depth, kernel_size=1, bias=False),
             nn.BatchNorm1d(depth),
             nn.ReLU(),
 
-            nn.Conv1d(depth, depth, kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(depth, depth, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm1d(depth),
+            SqueezeExcitation(depth),
             nn.ReLU(),
 
-            nn.Conv1d(depth, outs, kernel_size=1),
-            nn.MaxPool1d(kernel_size=3, stride=3),
+            nn.Conv1d(depth, outs, kernel_size=1, bias=False),
+            nn.BatchNorm1d(outs),
             nn.Dropout(p=p)
         )
 
-    def forward(self, sample):
-        return self.block(sample)
-
-
-# class SeConvBlock(nn.Module):
-#     def __init__(self, ins, outs, squeeze_ratio=0.5):
-#         super(SeConvBlock, self).__init__()
-#         n_squeeze = int(outs * squeeze_ratio)
-#
-#         self.layers = nn.Sequential(
-#             nn.Conv1d(ins, outs, kernel_size=3, stride=1, padding=1),
-#             nn.BatchNorm1d(outs),
-#             nn.ReLU(),
-#             nn.MaxPool1d(3, stride=3)
-#         )
-#
-#         self.excitation = nn.Sequential(
-#             nn.AdaptiveMaxPool1d(1),
-#             nn.Conv1d(outs, n_squeeze, kernel_size=1),
-#             nn.ReLU(),
-#             nn.Conv1d(n_squeeze, outs, kernel_size=1),
-#             nn.Sigmoid(),
-#         )
-#
-#     def forward(self, sample):
-#         out = self.layers(sample)
-#         excitation = self.excitation(out)
-#         return out * excitation
-
-
-class SampCNN(nn.Module):
-    def __init__(self):
-        super(SampCNN, self).__init__()
-        self.features = nn.Sequential(
-            ConvBlock(1, 32),  # 16384 - 5461
-            ConvBlock(32, 32),  # - 1820
-            ConvBlock(32, 32),  # - 606
-            ConvBlock(32, 64),  # - 202
-            ConvBlock(64, 64),  # - 67
-            ConvBlock(64, 64),  # - 22
-            ConvBlock(64, 128),  # - 7
-            nn.AdaptiveMaxPool1d(1),
-            Flatten(),
-        )
-
-        self.classifier = nn.Sequential(
-            nn.Linear(128, 256), nn.BatchNorm1d(256), nn.Dropout(p=0.5), nn.ReLU(),
-            nn.Linear(256, 1), nn.Sigmoid()
-        )
-
-        self.criterion = BCELoss()
-        self.metric = BinaryClassificationMetrics
-
-    def forward(self, batch):
-        out = self.features(batch['audio'])
-        out = self.classifier(out)
-        return {'target': out}
+    def forward(self, x):
+        return self.mp(self.conv(x) + self.skip(x))
 
 
 class SampleCNN(nn.Module):
@@ -107,7 +60,7 @@ class SampleCNN(nn.Module):
         super(SampleCNN, self).__init__()
 
         fn = list(zip(n_filter, n_filter[1:]))
-        self.features = nn.Sequential(*[DwsBlock(i, o, p=p) for i, o in fn])
+        self.features = nn.Sequential(*[ConvBlock(i, o, p=p) for i, o in fn])
 
         self.clf = nn.Sequential(
             nn.AdaptiveMaxPool1d(1),

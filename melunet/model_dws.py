@@ -10,7 +10,15 @@ class ConvBlock(nn.Module):
     def __init__(self, ins, outs, sample_mode, p=0.1):
         super(ConvBlock, self).__init__()
 
-        hidden = 6 * outs
+        resample = nn.ModuleDict({
+            'none': nn.Identity(),
+            'up': nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            'down': nn.MaxPool2d(2, 2),
+        })
+        self.resample = resample[sample_mode]
+        self.skip = nn.Conv2d(ins, outs, kernel_size=1)
+
+        hidden = 8 * outs
         self.conv = nn.Sequential(
             nn.Conv2d(ins, hidden, kernel_size=1, bias=False),
             nn.BatchNorm2d(hidden),
@@ -22,18 +30,6 @@ class ConvBlock(nn.Module):
 
             nn.Conv2d(hidden, outs, kernel_size=1, bias=False),
             nn.BatchNorm2d(outs),
-        )
-
-        self.skip = nn.Conv2d(ins, outs, kernel_size=1)
-
-        resample = nn.ModuleDict({
-            'none': nn.Identity(),
-            'up': nn.ConvTranspose2d(outs, outs, kernel_size=3),
-            'down': nn.MaxPool2d(2, 2),
-        })
-
-        self.resample = nn.Sequential(
-            resample[sample_mode],
             nn.Dropout(p=p)
         )
 
@@ -52,7 +48,9 @@ class PoolFrequency(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, num_filters, ins=1, outs=1, loss_ratio=0.1, p=0.1, **kwargs):
+    def __init__(self, num_filters,
+                 in_channel=1, out_classes=1,
+                 loss_ratio=0.1, p=0.1):
         super(Unet, self).__init__()
 
         fn = num_filters
@@ -61,7 +59,7 @@ class Unet(nn.Module):
         fup = list(zip(fnr, fnr[1:]))
 
         self.encoder = nn.ModuleList(
-            [ConvBlock(ins, fn[0], 'none', p=p)] +
+            [ConvBlock(in_channel, fn[0], 'none', p=p)] +
             [ConvBlock(i, o, 'down', p=p) for i, o in fdown]
         )
         self.decoder = nn.ModuleList(
@@ -69,7 +67,7 @@ class Unet(nn.Module):
             [ConvBlock(fn[0] * 2, 8, 'none', p=0)]
         )
 
-        self.poolfreq = PoolFrequency(8, outs)
+        self.poolfreq = PoolFrequency(8, out_classes)
 
         self.criterion = PooledSegmentationLoss(llambda=loss_ratio)
         self.metric = SegmentationMetrics

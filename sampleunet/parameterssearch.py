@@ -55,7 +55,7 @@ for _ in range(1000):
     params = gen_params()
     uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
     params['uid'] = uid
-    fpath = Path(f'experiment_runs/{uid}.csv')
+    fpath = Path(f'experiment_runs_SE/{uid}.csv')
 
     res = experiment(**params)
     res = [{**r, **params} for r in res]
