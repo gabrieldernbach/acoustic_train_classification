@@ -4,7 +4,6 @@ from pathlib import Path
 from random import choice
 
 import pandas as pd
-from numpy.random import uniform
 
 from sampleunet.experiment import experiment
 
@@ -34,15 +33,15 @@ def gen_params():
         'subset_fraction': 1.0,
         'random_state': choice([0, 1, 2]),
         'data_set_in_memory': False,
-        'learning_rate': uniform(0.001, 0.01),
-        'weight_decay': uniform(1e-7, 1e-3),
-        'mixup_ratio': uniform(0.01, 0.4),
+        'learning_rate': 0.005,  # uniform(0.001, 0.01),
+        'weight_decay': 0.0004,  # uniform(1e-7, 1e-3),
+        'mixup_ratio': 0.25,  # uniform(0.01, 0.4),
         'reduce_plateau_patience': 5,
         'early_stop_patience': 10,
         'max_epoch': 200,
 
-        'loss_ratio': uniform(0.01, 0.4),
-        'dropout_ratio': uniform(0.0, 0.3),
+        'loss_ratio': 0.1,  # uniform(0.01, 0.4),
+        'dropout_ratio': 0.2,  # uniform(0.0, 0.3),
         'num_filters': [2, 4, 8, 16, 32, 64, 128, 256]
     }
     params['data_path'] = datasets[params['dataset']]
@@ -51,12 +50,27 @@ def gen_params():
     return params
 
 
-for _ in range(1000):
-    params = gen_params()
-    uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
-    params['uid'] = uid
-    fpath = Path(f'experiment_runs_SE/{uid}.csv')
+# for _ in range(1000):
+#     params = gen_params()
+#     uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
+#     params['uid'] = uid
+#     fpath = Path(f'experiment_runs_SE/{uid}.csv')
+#
+#     res = experiment(**params)
+#     res = [{**r, **params} for r in res]
+#     pd.DataFrame(res).to_csv(fpath)
 
-    res = experiment(**params)
-    res = [{**r, **params} for r in res]
-    pd.DataFrame(res).to_csv(fpath)
+for dataset, dataset_path in datasets.items():
+    for random_state in [0, 1, 2]:
+        params = gen_params()
+        params['dataset'] = dataset
+        params['data_path'] = dataset_path
+        params['random_state'] = random_state
+
+        uid = hashlib.md5(json.dumps({**params}).encode()).hexdigest()
+        params['uid'] = uid
+        fpath = Path(f'experiment_runs/{uid}.csv')
+
+        res = experiment(**params)
+        res = [{**r, **params} for r in res]
+        pd.DataFrame(res).to_csv(fpath)

@@ -42,3 +42,7 @@ plt.show()
 # plt.show()
 
 print(data[data['phase'] == 'test'].sort_values('f1pos').iloc[-1])
+
+top = data[data.phase == 'test']
+top = top[top.dataset == 'beatfrequency_5sec']
+print(top)

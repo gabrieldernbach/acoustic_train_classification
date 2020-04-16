@@ -6,8 +6,8 @@ import seaborn as sns
 
 pd.set_option('display.expand_frame_repr', False)
 
-# result_path = Path('experiment_runs/')
-result_path = Path('experiment_runs_old/')
+result_path = Path('experiment_runs/')
+# result_path = Path('experiment_runs_old/')
 data = pd.concat([pd.read_csv(p) for p in result_path.glob('*.csv')])
 data['dataset'] = data['dataset'].replace('trainpseed_5sec', 'trainspeed_5sec')
 data = data.sort_values('dataset')
@@ -39,4 +39,14 @@ plt.savefig('melunet.svg', format='svg', dpi=300)
 plt.savefig('melunet.pdf', format='pdf', dpi=300)
 plt.show()
 
-print(data[data['phase'] == 'test'].sort_values('f1pos').iloc[-1])
+dtest = data[data['phase'] == 'test'].sort_values('f1pos')
+top = dtest[dtest.dataset == 'beatfrequency_5sec']
+# top = dtest.iloc[-5:]
+
+
+top = top[['tp', 'fp', 'fn', 'tn', 'f1pos', 'random_state', 'num_filters']]
+
+# print(dtest)
+top = data[data.phase == 'test']
+top = top[top.dataset == 'beatfrequency_5sec']
+print(top)

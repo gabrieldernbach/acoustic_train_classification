@@ -36,10 +36,10 @@ def load(register):
 
 
 if __name__ == "__main__":
-    for _ in range(1000):
+    for i in range(3):
         for dataset_name, root in datasets.items():
             register = build_register(root)
-            train, test = group_split(register, random_state=np.random.randint(0, 1000), group='file_name')
+            train, test = group_split(register, random_state=i, group='file_name')
             X_train, G_train, Y_train = load(train)
             X_test, G_test, Y_test = load(test)
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
             parameter_distribution = {
                 'quantile': [
                     'passthrough',
-                    QuantileTransformer(output_distribution='uniform'),
+                    # QuantileTransformer(output_distribution='uniform'),
                     # QuantileTransformer(output_distribution='normal')
                 ],
                 'svc__C':
@@ -74,11 +74,12 @@ if __name__ == "__main__":
             random_search.fit(X_train, Y_train, groups=G_train)
 
             # save detailed random search info
-            result_path = '/Users/gabrieldernbach/git/acoustic_train_class_data/experiment_runs/svm/'
-            Path(result_path).mkdir(parents=True, exist_ok=True)
+            # result_path = '/Users/gabrieldernbach/git/acoustic_train_class_data/experiment_runs/svm/'
+            # Path(result_path).mkdir(parents=True, exist_ok=True)
+            result_path = Path.cwd() / 'experiment_runs'
             results = pd.DataFrame(random_search.cv_results_)
             results['dataset_name'] = dataset_name
-            results.to_csv(f'{result_path}exp_{datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}.csv')
+            results.to_csv(f'{result_path}/exp_{datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}.csv')
 
             # evaluate on test set and save separately
             eval_test = {

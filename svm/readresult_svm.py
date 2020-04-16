@@ -28,6 +28,9 @@ plt.xticks(rotation=30, horizontalalignment='right', fontweight='light')
 chart.set_ylim(0.3, 0.85)
 
 plt.title('svm with c=1, gamma=0.001')
+plt.tight_layout()
+plt.savefig('svm.svg', format='svg', dpi=300)
+plt.savefig('svm.pdf', format='pdf', dpi=300)
 plt.show()
 
 # result_path = Path('/Users/gabrieldernbach/git/acoustic_train_class_data/experiment_runs/svm/')
@@ -53,3 +56,12 @@ plt.show()
 #
 # print('results')
 # print('finish')
+
+
+# chart = sns.boxplot(x='dataset', y='f1pos', data=data[data['phase'] == 'test'])
+# chart.set_ylim(0.3, 0.85)
+# plt.title('melunet - test set f1')
+# plt.xticks(rotation=30, horizontalalignment='right', fontweight='light')
+# plt.tight_layout()
+#
+# plt.show()
