@@ -23,7 +23,7 @@ llvmlite==0.31.0
 matplotlib==3.2.0
 networkx==2.4
 numba==0.48.0
-numpy==1.18.1
+numpy==1.22.0
 olefile==0.46
 pandas==1.0.1
 parso==0.6.2
